@@ -249,6 +249,68 @@ select.form-input option { background:#111827; }
   .form-grid-2 { grid-template-columns:1fr; }
   .form-section { max-width:100%; }
 }
+/* AI Chat */
+.ai-container { max-width:720px; margin:0 auto; }
+.ai-welcome { text-align:center; padding:48px 24px; }
+.ai-welcome-icon { font-size:48px; margin-bottom:16px; opacity:0.8; }
+.ai-welcome-title { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; letter-spacing:1px; margin-bottom:8px; background:linear-gradient(135deg, #a78bfa, #818cf8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.ai-welcome-sub { font-size:13px; color:var(--dim); line-height:1.6; }
+.ai-suggestions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:24px; }
+@media(max-width:500px){ .ai-suggestions { grid-template-columns:1fr; } }
+.ai-suggest-btn {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:14px 16px; cursor:pointer; text-align:left; transition:all 0.25s;
+  font-family:'Outfit',sans-serif; font-size:12.5px; color:var(--dim); line-height:1.4;
+}
+.ai-suggest-btn:hover { border-color:rgba(167,139,250,0.3); color:var(--text); background:rgba(167,139,250,0.05); }
+.ai-suggest-btn span { display:block; font-weight:600; color:var(--text); margin-bottom:3px; font-size:13px; }
+.ai-messages { display:flex; flex-direction:column; gap:16px; padding-bottom:16px; }
+.ai-msg {
+  border-radius:16px; padding:16px 20px; font-size:13.5px; line-height:1.65;
+  max-width:85%; animation:msgFade 0.3s ease;
+}
+@keyframes msgFade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.ai-msg.user {
+  background:rgba(167,139,250,0.12); border:1px solid rgba(167,139,250,0.15);
+  align-self:flex-end; color:var(--text);
+}
+.ai-msg.assistant {
+  background:var(--surface); border:1px solid var(--border);
+  align-self:flex-start; color:var(--text);
+}
+.ai-msg.assistant p { margin-bottom:10px; }
+.ai-msg.assistant p:last-child { margin-bottom:0; }
+.ai-msg.assistant strong { color:#a78bfa; font-weight:600; }
+.ai-msg.assistant code { background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:12px; }
+.ai-msg.assistant ul, .ai-msg.assistant ol { margin:8px 0; padding-left:20px; }
+.ai-msg.assistant li { margin-bottom:4px; }
+.ai-typing { display:flex; gap:5px; padding:16px 20px; align-self:flex-start; }
+.ai-typing span { width:7px; height:7px; border-radius:50%; background:var(--dim); animation:typingDot 1.2s infinite; }
+.ai-typing span:nth-child(2) { animation-delay:0.2s; }
+.ai-typing span:nth-child(3) { animation-delay:0.4s; }
+@keyframes typingDot { 0%,60%,100%{opacity:0.3;transform:scale(0.8)} 30%{opacity:1;transform:scale(1)} }
+.ai-input-wrap {
+  position:sticky; bottom:0; background:linear-gradient(transparent, var(--bg) 20%);
+  padding:20px 0 8px; display:flex; gap:10px; align-items:flex-end;
+}
+.ai-input {
+  flex:1; background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:14px 18px; font-size:14px; color:var(--text); font-family:'Outfit',sans-serif;
+  resize:none; outline:none; min-height:48px; max-height:120px; line-height:1.5;
+  transition:border-color 0.25s;
+}
+.ai-input::placeholder { color:var(--dim2); }
+.ai-input:focus { border-color:rgba(167,139,250,0.4); }
+.ai-send {
+  width:46px; height:46px; border-radius:13px; border:none; cursor:pointer;
+  background:linear-gradient(135deg, #a78bfa, #818cf8); color:#fff;
+  font-size:18px; display:flex; align-items:center; justify-content:center;
+  transition:all 0.25s; flex-shrink:0;
+}
+.ai-send:hover { transform:scale(1.05); box-shadow:0 4px 20px rgba(167,139,250,0.3); }
+.ai-send:disabled { opacity:0.4; cursor:default; transform:none; box-shadow:none; }
+.ai-clear { position:absolute; right:0; top:-36px; background:none; border:none; color:var(--dim); font-size:11px; cursor:pointer; font-family:'Outfit',sans-serif; padding:4px 8px; border-radius:6px; transition:color 0.2s; }
+.ai-clear:hover { color:var(--text); }
 </style>
 </head>
 <body>
@@ -269,6 +331,7 @@ select.form-input option { background:#111827; }
       <button class="nav-btn" onclick="switchView('insights')">Insights</button>
       <button class="nav-btn" onclick="switchView('health')">Health</button>
       <button class="nav-btn" onclick="switchView('strava')" style="color:#fc4c02">Strava</button>
+      <button class="nav-btn" onclick="switchView('ai')" style="color:#a78bfa">✦ AI</button>
       <div class="nav-spacer"></div>
       <button class="range-btn" onclick="switchRange('1w')">1W</button>
       <button class="range-btn" onclick="switchRange('1m')">1M</button>
@@ -504,6 +567,31 @@ select.form-input option { background:#111827; }
         <div class="collapsible-body">
           <div style="overflow-x:auto"><table class="run-table"><thead><tr><th>Date</th><th>Name</th><th>Pace</th><th>Miles</th><th>Time</th><th>HR</th><th>Elevation</th></tr></thead><tbody id="stravaLogBody"></tbody></table></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ AI ASSISTANT ═══ -->
+  <div id="view-ai" class="hidden">
+    <div class="ai-container">
+      <div id="ai-welcome">
+        <div class="ai-welcome">
+          <div class="ai-welcome-icon">✦</div>
+          <div class="ai-welcome-title">STRIDE AI</div>
+          <div class="ai-welcome-sub">Ask me anything about your fitness data.<br>I can analyze trends, compare time periods, and surface insights.</div>
+          <div class="ai-suggestions">
+            <button class="ai-suggest-btn" onclick="aiAsk(this.dataset.q)" data-q="How has my running performance changed over the past 6 months?"><span>📈 Performance trend</span>Analyze my running over time</button>
+            <button class="ai-suggest-btn" onclick="aiAsk(this.dataset.q)" data-q="What's the correlation between my weight and running frequency? Do I run more when I'm lighter?"><span>⚖️ Weight vs running</span>Find correlations in my data</button>
+            <button class="ai-suggest-btn" onclick="aiAsk(this.dataset.q)" data-q="Give me a detailed training summary for my last 10 runs including pace, distance, and heart rate trends."><span>🏃 Training summary</span>Recap my recent runs</button>
+            <button class="ai-suggest-btn" onclick="aiAsk(this.dataset.q)" data-q="Which shoes give me the best pace? Break down my average pace and total mileage by shoe."><span>👟 Shoe analysis</span>Compare performance by shoe</button>
+          </div>
+        </div>
+      </div>
+      <div id="ai-messages" class="ai-messages"></div>
+      <div class="ai-input-wrap" style="position:relative">
+        <button class="ai-clear hidden" id="ai-clear-btn" onclick="aiClear()">Clear chat</button>
+        <textarea class="ai-input" id="ai-input" placeholder="Ask about your data..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend()}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button class="ai-send" id="ai-send-btn" onclick="aiSend()">↑</button>
       </div>
     </div>
   </div>
@@ -874,11 +962,12 @@ function showToast(msg) {
 // ═══ NAVIGATION ═══
 function switchView(v) {
   currentView=v;
-  ['dashboard','log-weight','log-run','insights','health','strava'].forEach(id=>{
+  ['dashboard','log-weight','log-run','insights','health','strava','ai'].forEach(id=>{
     document.getElementById('view-'+id).classList.toggle('hidden',id!==v);
   });
   document.querySelectorAll('.nav-btn').forEach(btn=>{
-    btn.classList.toggle('active', btn.textContent.toLowerCase().replace(' ','-')===v);
+    const t=btn.textContent.toLowerCase().replace(' ','-').replace('✦-','');
+    btn.classList.toggle('active', t===v);
   });
   if(v==='dashboard') renderDashboard();
   if(v==='insights') renderInsights();
@@ -1734,6 +1823,162 @@ async function init() {
 
 // Chart.js defaults
 Chart.defaults.font.family="'Outfit',sans-serif";
+
+// ═══ AI ASSISTANT ═══
+let aiHistory=[];
+
+function aiGetDataContext(){
+  const allRuns=[...runs,...stravaRuns].sort((a,b)=>a.date.localeCompare(b.date));
+  const recentRuns=allRuns.slice(-30);
+  const recentWeights=weights.slice(-30);
+  
+  // Build compact data summary
+  const totalRuns=allRuns.length;
+  const totalWeights=weights.length;
+  const shoes={};
+  allRuns.forEach(r=>{
+    const s=r.shoe||'Unknown';
+    if(!shoes[s]) shoes[s]={count:0,miles:0,paces:[]};
+    shoes[s].count++;
+    const m=parseFloat(r.mileage)||0;
+    shoes[s].miles+=m;
+    const p=parsePace(r.pace);
+    if(p) shoes[s].paces.push(p);
+  });
+  const shoeStats=Object.entries(shoes).map(([name,d])=>({
+    name,runs:d.count,miles:d.miles.toFixed(1),
+    avgPace:d.paces.length?fmtPace(d.paces.reduce((a,b)=>a+b)/d.paces.length):'—'
+  }));
+
+  const yearRuns={};
+  allRuns.forEach(r=>{
+    const yr=r.date?.substring(0,4)||'?';
+    if(!yearRuns[yr]) yearRuns[yr]={count:0,miles:0};
+    yearRuns[yr].count++;
+    yearRuns[yr].miles+=parseFloat(r.mileage)||0;
+  });
+
+  return `STRIDE Fitness Data for Gary:
+TODAY: ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}
+
+WEIGHT SUMMARY (${totalWeights} entries):
+- Current: ${weights.length?weights[weights.length-1].weight+' lbs on '+weights[weights.length-1].date:'No data'}
+- All-time low: ${weights.length?Math.min(...weights.map(w=>w.weight))+' lbs':'—'}
+- All-time high: ${weights.length?Math.max(...weights.map(w=>w.weight))+' lbs':'—'}
+- Recent 30 weigh-ins: ${recentWeights.map(w=>w.date+': '+w.weight).join(', ')}
+
+RUNNING SUMMARY (${totalRuns} total runs):
+- By year: ${Object.entries(yearRuns).map(([yr,d])=>yr+': '+d.count+' runs, '+d.miles.toFixed(1)+' mi').join(' | ')}
+- Shoe stats: ${JSON.stringify(shoeStats)}
+- Recent 30 runs: ${JSON.stringify(recentRuns.map(r=>({date:r.date,route:r.route,pace:r.pace,miles:r.mileage,time:r.time,shoe:r.shoe,hr:r.avgHR,notes:r.notes,elevation:r.elevation||'',suffer:r.sufferScore||''})))}
+
+ALL RUNS (dates+pace+miles): ${allRuns.map(r=>r.date+'|'+r.pace+'|'+r.mileage+'|'+r.route+'|'+(r.shoe||'')).join('\n')}`;
+}
+
+function aiRenderMsg(role, text){
+  const container=document.getElementById('ai-messages');
+  const div=document.createElement('div');
+  div.className='ai-msg '+role;
+  if(role==='assistant'){
+    // Basic markdown-like rendering
+    let html=text
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/`(.*?)`/g,'<code>$1</code>')
+      .replace(/\n\n/g,'</p><p>')
+      .replace(/\n- /g,'<br>• ')
+      .replace(/\n(\d+)\. /g,'<br>$1. ')
+      .replace(/\n/g,'<br>');
+    div.innerHTML='<p>'+html+'</p>';
+  } else {
+    div.textContent=text;
+  }
+  container.appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function aiShowTyping(){
+  const container=document.getElementById('ai-messages');
+  const div=document.createElement('div');
+  div.className='ai-typing';
+  div.id='ai-typing';
+  div.innerHTML='<span></span><span></span><span></span>';
+  container.appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function aiHideTyping(){
+  const el=document.getElementById('ai-typing');
+  if(el) el.remove();
+}
+
+async function aiSend(){
+  const input=document.getElementById('ai-input');
+  const q=input.value.trim();
+  if(!q) return;
+  input.value='';
+  input.style.height='auto';
+  aiAsk(q);
+}
+
+async function aiAsk(question){
+  // Hide welcome, show messages
+  document.getElementById('ai-welcome').classList.add('hidden');
+  document.getElementById('ai-clear-btn').classList.remove('hidden');
+  
+  // Render user message
+  aiRenderMsg('user', question);
+  
+  // Build messages for API
+  const systemPrompt=`You are STRIDE AI, a fitness data analyst embedded in Gary's personal fitness dashboard. You have access to his complete weight and running data below.
+
+Be concise, insightful, and specific — reference actual numbers, dates, and trends from the data. Use a warm, coach-like tone. Format with bold for emphasis and bullet points for lists when helpful. Keep responses focused and under 300 words unless a detailed breakdown is requested.
+
+${aiGetDataContext()}`;
+
+  aiHistory.push({role:'user',content:question});
+  
+  const messages=[
+    {role:'user',content:systemPrompt+'\\n\\nQuestion: '+aiHistory[0].content}
+  ];
+  // Add conversation history after first exchange
+  for(let i=1;i<aiHistory.length;i++){
+    messages.push(aiHistory[i]);
+  }
+
+  // Show typing indicator
+  aiShowTyping();
+  document.getElementById('ai-send-btn').disabled=true;
+
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:messages
+      })
+    });
+    const data=await r.json();
+    aiHideTyping();
+    
+    const reply=data.content?.map(c=>c.text||'').join('')||'Sorry, I couldn\'t process that. Try again.';
+    aiHistory.push({role:'assistant',content:reply});
+    aiRenderMsg('assistant', reply);
+  }catch(e){
+    aiHideTyping();
+    aiRenderMsg('assistant','Something went wrong connecting to AI. Please try again.');
+    console.error('AI error:',e);
+  }
+  document.getElementById('ai-send-btn').disabled=false;
+}
+
+function aiClear(){
+  aiHistory=[];
+  document.getElementById('ai-messages').innerHTML='';
+  document.getElementById('ai-welcome').classList.remove('hidden');
+  document.getElementById('ai-clear-btn').classList.add('hidden');
+}
 
 init();
 </script>
