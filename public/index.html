@@ -306,15 +306,15 @@ select.form-input option { background:#111827; }
 .ai-input {
   flex:1; background:var(--surface); border:1px solid var(--border); border-radius:14px;
   padding:14px 18px; font-size:14px; color:var(--text); font-family:'Outfit',sans-serif;
-  resize:none; outline:none; min-height:48px; max-height:120px; line-height:1.5;
+  outline:none; height:48px; line-height:1.5;
   transition:border-color 0.25s;
 }
 .ai-input::placeholder { color:var(--dim2); }
 .ai-input:focus { border-color:rgba(167,139,250,0.4); }
 .ai-send {
-  width:46px; height:46px; border-radius:13px; border:none; cursor:pointer;
+  width:48px; height:48px; border-radius:13px; border:none; cursor:pointer;
   background:linear-gradient(135deg, #a78bfa, #818cf8); color:#fff;
-  font-size:18px; display:flex; align-items:center; justify-content:center;
+  font-size:20px; display:flex; align-items:center; justify-content:center;
   transition:all 0.25s; flex-shrink:0;
 }
 .ai-send:hover { transform:scale(1.05); box-shadow:0 4px 20px rgba(167,139,250,0.3); }
@@ -601,7 +601,7 @@ select.form-input option { background:#111827; }
       <div id="ai-messages" class="ai-messages"></div>
       <div class="ai-input-wrap" style="position:relative">
         <button class="ai-clear hidden" id="ai-clear-btn" onclick="aiClear()">Clear chat</button>
-        <textarea class="ai-input" id="ai-input" placeholder="Ask about your data..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend()}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <input type="text" class="ai-input" id="ai-input" placeholder="Ask about your data..." enterkeyhint="send" onkeydown="if(event.key==='Enter'){event.preventDefault();aiSend()}">
         <button class="ai-send" id="ai-send-btn" onclick="aiSend()">↑</button>
       </div>
     </div>
@@ -1927,7 +1927,7 @@ async function aiSend(){
   const q=input.value.trim();
   if(!q) return;
   input.value='';
-  input.style.height='auto';
+  input.blur();
   aiAsk(q);
 }
 
@@ -1961,13 +1961,12 @@ ${aiGetDataContext()}`;
   document.getElementById('ai-send-btn').disabled=true;
 
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
+    const r=await fetch('https://stride-proxy.vercel.app/api/ai',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:messages
+        messages:messages,
+        max_tokens:1000
       })
     });
     const data=await r.json();
