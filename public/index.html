@@ -241,6 +241,7 @@ select.form-input option { background:#111827; }
 .empty-state { color:var(--dim); font-size:13px; padding:8px 0; }
 .hidden { display:none !important; }
 
+.nav-range { margin-top:8px; }
 @media(max-width:640px) {
   .header { padding:20px 16px 16px; }
   .main { padding:16px 16px 60px; }
@@ -248,6 +249,16 @@ select.form-input option { background:#111827; }
   .form-grid-3 { grid-template-columns:1fr; }
   .form-grid-2 { grid-template-columns:1fr; }
   .form-section { max-width:100%; }
+  #nav-tabs { overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none; gap:6px; padding-bottom:2px; }
+  #nav-tabs::-webkit-scrollbar { display:none; }
+  .nav-btn { white-space:nowrap; padding:7px 14px; font-size:12px; flex-shrink:0; }
+  .nav-range { margin-top:6px; }
+  .range-btn { padding:5px 10px; font-size:10px; }
+  .ai-welcome { padding:32px 16px; }
+  .ai-suggestions { grid-template-columns:1fr; gap:8px; }
+  .ai-msg { max-width:92%; padding:14px 16px; font-size:13px; }
+  .ai-input-wrap { padding:12px 0 4px; }
+  .ai-input { padding:12px 14px; font-size:13px; }
 }
 /* AI Chat */
 .ai-container { max-width:720px; margin:0 auto; }
@@ -256,7 +267,6 @@ select.form-input option { background:#111827; }
 .ai-welcome-title { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; letter-spacing:1px; margin-bottom:8px; background:linear-gradient(135deg, #a78bfa, #818cf8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .ai-welcome-sub { font-size:13px; color:var(--dim); line-height:1.6; }
 .ai-suggestions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:24px; }
-@media(max-width:500px){ .ai-suggestions { grid-template-columns:1fr; } }
 .ai-suggest-btn {
   background:var(--surface); border:1px solid var(--border); border-radius:12px;
   padding:14px 16px; cursor:pointer; text-align:left; transition:all 0.25s;
@@ -324,7 +334,7 @@ select.form-input option { background:#111827; }
       <button class="gear-btn" onclick="toggleSettings()" title="Settings">⚙</button>
     </div>
     <div class="subtitle" id="subtitle">Weight & Run Tracker</div>
-    <div class="nav">
+    <div class="nav" id="nav-tabs">
       <button class="nav-btn active" onclick="switchView('dashboard')">Dashboard</button>
       <button class="nav-btn" onclick="switchView('log-weight')">Log Weight</button>
       <button class="nav-btn" onclick="switchView('log-run')">Log Run</button>
@@ -332,7 +342,8 @@ select.form-input option { background:#111827; }
       <button class="nav-btn" onclick="switchView('health')">Health</button>
       <button class="nav-btn" onclick="switchView('strava')" style="color:#fc4c02">Strava</button>
       <button class="nav-btn" onclick="switchView('ai')" style="color:#a78bfa">✦ AI</button>
-      <div class="nav-spacer"></div>
+    </div>
+    <div class="nav nav-range" id="nav-range">
       <button class="range-btn" onclick="switchRange('1w')">1W</button>
       <button class="range-btn" onclick="switchRange('1m')">1M</button>
       <button class="range-btn" onclick="switchRange('3m')">3M</button>
