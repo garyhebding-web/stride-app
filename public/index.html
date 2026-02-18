@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRIDE — Weight & Run Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@mapbox/polyline@1.2.1/src/polyline.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #07080f;
+  --surface: #0f1119;
+  --surface2: #161822;
+  --border: rgba(255,255,255,0.06);
+  --accent: #e63946;
+  --accent-glow: rgba(230,57,70,0.15);
+  --accent2: #457b9d;
+  --green: #2ec4b6;
+  --orange: #f77f00;
+  --text: #e8eaed;
+  --dim: #6b7280;
+  --dim2: #3d4250;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif; min-height:100vh; }
+::selection { background:var(--accent); color:#fff; }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-thumb { background:var(--dim2); border-radius:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+
+.header {
+  background: linear-gradient(165deg, #07080f 0%, #111827 40%, #0c1929 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 28px 32px 20px;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(20px);
+}
+.header-inner { max-width:100%; margin:0 auto; }
+.logo-row { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+.logo-icon {
+  width:40px; height:40px; border-radius:12px;
+  background: linear-gradient(135deg, var(--accent), #c1121f);
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; box-shadow: 0 4px 20px var(--accent-glow);
+}
+.logo-text {
+  font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700;
+  background: linear-gradient(135deg, var(--accent), var(--orange));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  letter-spacing: 3px;
+}
+.subtitle { font-size:13px; color:var(--dim); margin-bottom:18px; }
+.nav { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.nav-btn {
+  padding:7px 18px; border-radius:24px; border:none; cursor:pointer;
+  font-size:13px; font-weight:600; font-family:'Outfit',sans-serif;
+  background:rgba(255,255,255,0.04); color:var(--dim);
+  transition: all 0.25s ease;
+}
+.nav-btn:hover { background:rgba(255,255,255,0.08); color:var(--text); }
+.nav-btn.active { background:var(--accent); color:#fff; box-shadow:0 4px 16px var(--accent-glow); }
+.nav-spacer { flex:1; }
+.range-btn {
+  padding:5px 12px; border-radius:16px; border:none; cursor:pointer;
+  font-size:11px; font-weight:700; font-family:'JetBrains Mono',monospace;
+  background:rgba(255,255,255,0.03); color:var(--dim2);
+  letter-spacing:1px; transition: all 0.2s;
+}
+.range-btn:hover { color:var(--dim); }
+.range-btn.active { background:rgba(69,123,157,0.2); color:var(--accent2); }
+
+.main { max-width:100%; margin:0 auto; padding:24px 32px 80px; }
+
+/* Gear / Settings */
+.gear-btn {
+  width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
+  background:rgba(255,255,255,0.04); color:var(--dim); font-size:18px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition: all 0.25s;
+}
+.gear-btn:hover { background:rgba(255,255,255,0.08); color:var(--text); border-color:rgba(255,255,255,0.12); }
+.settings-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200;
+  backdrop-filter:blur(4px);
+}
+.settings-overlay.open { display:block; }
+.settings-panel {
+  display:none; position:fixed; top:0; right:0; bottom:0; width:340px; max-width:90vw;
+  background:var(--surface); border-left:1px solid var(--border); z-index:201;
+  padding:28px 24px; overflow-y:auto;
+  box-shadow:-8px 0 40px rgba(0,0,0,0.4);
+}
+.settings-panel.open { display:block; }
+.settings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+.settings-title { font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; letter-spacing:1px; }
+.settings-close {
+  width:32px; height:32px; border-radius:8px; border:1px solid var(--border);
+  background:rgba(255,255,255,0.04); color:var(--dim); font-size:14px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s;
+}
+.settings-close:hover { background:rgba(255,255,255,0.08); color:var(--text); }
+.settings-section { margin-bottom:28px; }
+.settings-label { font-size:10px; font-weight:700; color:var(--dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
+.theme-grid { display:flex; flex-direction:column; gap:10px; }
+.theme-option {
+  display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:12px;
+  border:2px solid var(--border); cursor:pointer; transition:all 0.2s;
+  background:rgba(255,255,255,0.02);
+}
+.theme-option:hover { border-color:rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); }
+.theme-option.active { border-color:var(--accent2); background:rgba(69,123,157,0.08); }
+.theme-swatches { display:flex; gap:5px; }
+.theme-swatch { width:22px; height:22px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); }
+.theme-name { font-size:13px; font-weight:600; }
+.theme-desc { font-size:10px; color:var(--dim); margin-top:2px; }
+
+.card {
+  background:var(--surface); border-radius:16px; padding:22px 26px;
+  border:1px solid var(--border); margin-bottom:20px;
+  transition: border-color 0.3s;
+}
+.card:hover { border-color: rgba(255,255,255,0.1); }
+.card-title {
+  font-size:11px; font-weight:700; color:var(--dim); letter-spacing:2px;
+  text-transform:uppercase; margin-bottom:16px;
+}
+.card-title span { font-weight:500; letter-spacing:1px; margin-left:8px; }
+
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:14px; margin-bottom:22px; }
+.stat-card {
+  background:var(--surface); border-radius:14px; padding:16px 20px;
+  border:1px solid var(--border);
+}
+.stat-label { font-size:10px; font-weight:700; color:var(--dim); letter-spacing:1.5px; text-transform:uppercase; }
+.stat-value { font-size:24px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-top:4px; }
+.stat-sub { font-size:11px; color:var(--dim); margin-top:2px; }
+
+.chart-wrap { position:relative; height:280px; margin:0 -6px; }
+.chart-wrap-sm { height:200px; }
+
+/* Collapsible */
+.collapsible-toggle { cursor:pointer; user-select:none; display:flex; align-items:center; gap:4px; }
+.collapsible-toggle:hover { color:var(--text); }
+.collapse-arrow { display:inline-block; transition:transform 0.25s; font-size:12px; color:var(--dim); }
+.collapse-arrow.open { transform:rotate(90deg); }
+.collapsible-body { transition: max-height 0.35s ease, opacity 0.25s ease; overflow:hidden; }
+.collapsible-body.collapsed { max-height:0; opacity:0; }
+
+/* Forms */
+.form-section { max-width:480px; }
+.form-section h2 { font-size:22px; font-weight:700; margin-bottom:20px; font-family:'JetBrains Mono',monospace; }
+.form-grid { display:grid; gap:14px; }
+.form-grid-2 { grid-template-columns:1fr 1fr; }
+.form-grid-3 { grid-template-columns:1fr 1fr 1fr; }
+.form-group label {
+  display:block; font-size:10px; font-weight:700; color:var(--dim);
+  letter-spacing:1.5px; text-transform:uppercase; margin-bottom:5px;
+}
+.form-input {
+  width:100%; padding:11px 14px; border-radius:10px;
+  border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.04);
+  color:var(--text); font-size:14px; font-family:'Outfit',sans-serif;
+  outline:none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color:var(--accent); }
+.form-input-lg { font-size:28px; font-family:'JetBrains Mono',monospace; font-weight:700; text-align:center; padding:18px; }
+select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+select.form-input option { background:#111827; }
+.form-submit {
+  width:100%; padding:14px; border-radius:12px; border:none; cursor:pointer;
+  font-size:15px; font-weight:700; font-family:'Outfit',sans-serif;
+  background: linear-gradient(135deg, var(--accent), #c1121f);
+  color:#fff; margin-top:6px; transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+.form-submit:hover { transform:translateY(-1px); box-shadow:0 6px 28px var(--accent-glow); }
+.form-submit:active { transform:translateY(0); }
+
+/* Insights */
+.outlier-item {
+  padding:11px 16px; border-radius:10px; margin-bottom:8px;
+  border-left:3px solid;
+}
+.outlier-weight { background:rgba(247,127,0,0.06); border-color:var(--orange); }
+.outlier-pace { background:rgba(46,196,182,0.06); border-color:var(--green); }
+.outlier-val { font-weight:700; }
+.outlier-date { color:var(--dim); margin-left:8px; font-size:13px; }
+.outlier-dev { margin-left:8px; font-size:12px; font-family:'JetBrains Mono',monospace; }
+
+.yoy-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+.yoy-card { background:rgba(255,255,255,0.02); border-radius:12px; padding:16px; text-align:center; }
+.yoy-year { font-size:13px; color:var(--dim); font-weight:600; }
+.yoy-avg { font-size:26px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--accent); margin:4px 0; }
+.yoy-sub { font-size:11px; color:var(--dim); }
+
+.run-table { width:100%; border-collapse:collapse; font-size:13px; }
+.run-table th { text-align:left; padding:8px 10px; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid var(--border); }
+.run-table td { padding:9px 10px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.run-table tr:hover td { background:rgba(255,255,255,0.02); }
+
+.toast {
+  position:fixed; top:20px; right:20px; background:var(--accent); color:#fff;
+  padding:13px 26px; border-radius:14px; font-weight:700; font-size:14px;
+  box-shadow:0 8px 30px var(--accent-glow); z-index:9999;
+  animation: toastIn 0.35s ease;
+}
+@keyframes toastIn { from{transform:translateX(120px);opacity:0}to{transform:translateX(0);opacity:1} }
+
+/* Add-new inline */
+.add-new-btn {
+  width:38px; height:38px; border-radius:10px; border:1px dashed rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.04); color:var(--dim); font-size:20px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  transition: all 0.2s; font-family:'Outfit',sans-serif;
+}
+.add-new-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+.add-new-row {
+  display:flex; gap:6px; margin-top:6px; align-items:center;
+}
+.add-new-row.hidden { display:none; }
+.add-new-confirm {
+  padding:7px 14px; border-radius:8px; border:none; cursor:pointer;
+  font-size:12px; font-weight:700; font-family:'Outfit',sans-serif;
+  background:var(--green); color:#fff; white-space:nowrap;
+  transition: opacity 0.2s;
+}
+.add-new-confirm:hover { opacity:0.85; }
+.add-new-cancel {
+  padding:7px 10px; border-radius:8px; border:none; cursor:pointer;
+  font-size:14px; font-weight:700; font-family:'Outfit',sans-serif;
+  background:rgba(255,255,255,0.06); color:var(--dim);
+  transition: color 0.2s;
+}
+.add-new-cancel:hover { color:var(--text); }
+
+.empty-state { color:var(--dim); font-size:13px; padding:8px 0; }
+.hidden { display:none !important; }
+
+@media(max-width:640px) {
+  .header { padding:20px 16px 16px; }
+  .main { padding:16px 16px 60px; }
+  .stats-grid { grid-template-columns:repeat(2,1fr); }
+  .form-grid-3 { grid-template-columns:1fr; }
+  .form-grid-2 { grid-template-columns:1fr; }
+  .form-section { max-width:100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="logo-row">
+      <div class="logo-icon">🏃</div>
+      <div class="logo-text">STRIDE</div>
+      <div style="flex:1"></div>
+      <button class="gear-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+    </div>
+    <div class="subtitle" id="subtitle">Weight & Run Tracker</div>
+    <div class="nav">
+      <button class="nav-btn active" onclick="switchView('dashboard')">Dashboard</button>
+      <button class="nav-btn" onclick="switchView('log-weight')">Log Weight</button>
+      <button class="nav-btn" onclick="switchView('log-run')">Log Run</button>
+      <button class="nav-btn" onclick="switchView('insights')">Insights</button>
+      <button class="nav-btn" onclick="switchView('health')">Health</button>
+      <button class="nav-btn" onclick="switchView('strava')" style="color:#fc4c02">Strava</button>
+      <div class="nav-spacer"></div>
+      <button class="range-btn" onclick="switchRange('1w')">1W</button>
+      <button class="range-btn" onclick="switchRange('1m')">1M</button>
+      <button class="range-btn" onclick="switchRange('3m')">3M</button>
+      <button class="range-btn" onclick="switchRange('6m')">6M</button>
+      <button class="range-btn active" onclick="switchRange('1y')">1Y</button>
+      <button class="range-btn" onclick="switchRange('all')">ALL</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Overlay -->
+<div id="settings-overlay" class="settings-overlay" onclick="toggleSettings()"></div>
+<div id="settings-panel" class="settings-panel">
+  <div class="settings-header">
+    <span class="settings-title">⚙ Settings</span>
+    <button class="settings-close" onclick="toggleSettings()">✕</button>
+  </div>
+  <div class="settings-section">
+    <div class="settings-label">CLOUD SYNC</div>
+    <div id="supabase-status" style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:13px">
+      <span style="font-weight:600">☁️ Supabase</span> — <span id="supabase-status-text" style="color:var(--dim)">Checking...</span>
+      <div id="supabase-details" style="margin-top:8px;font-size:11px;color:var(--dim2);line-height:1.6"></div>
+    </div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-label">INTEGRATIONS</div>
+    <div id="strava-status" style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:13px">
+      <span style="font-weight:600">🔶 Strava</span> — <span id="strava-status-text" style="color:var(--dim)">Checking...</span>
+    </div>
+  </div>
+  <div class="settings-section">
+    <div class="settings-label">COLOR SCHEME</div>
+    <div class="theme-grid" id="theme-grid"></div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="view-dashboard">
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="card">
+      <div class="card-title">WEIGHT TREND <span style="color:var(--accent)">● actual</span> <span style="color:var(--accent2)">● 7-day avg</span> <span style="color:var(--orange)" id="outlier-legend"></span></div>
+      <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+    </div>
+    <div class="card" id="pace-card" class="hidden">
+      <div class="card-title">PACE OVER TIME <span style="color:var(--green)">min/mi — lower is faster</span></div>
+      <div class="chart-wrap" style="height:220px"><canvas id="paceChart"></canvas></div>
+    </div>
+    <div class="card" id="yearly-run-card" class="hidden">
+      <div class="card-title">🏃 RUNNING — <span id="run-year-label" style="color:var(--green)">2026</span></div>
+      <div class="stats-grid" id="run-stats-grid" style="margin-bottom:0"></div>
+      <div id="last-shoe-info"></div>
+    </div>
+    <div class="card" id="route-card" class="hidden">
+      <div class="card-title">MILEAGE BY ROUTE — <span id="route-year-label" style="color:var(--accent2)">2026</span></div>
+      <div class="chart-wrap" style="height:220px"><canvas id="routeChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">MONTHLY AVERAGE WEIGHT</div>
+      <div class="chart-wrap chart-wrap-sm"><canvas id="monthlyChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ LOG WEIGHT ═══ -->
+  <div id="view-log-weight" class="hidden">
+    <div class="form-section">
+      <h2>Log Weight</h2>
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-group"><label>Date</label><input type="date" id="wDate" class="form-input"></div>
+          <div class="form-group"><label>Weight (lbs)</label><input type="number" step="0.5" placeholder="193" id="wVal" class="form-input form-input-lg"></div>
+          <button class="form-submit" onclick="addWeight()">Save Weigh-In</button>
+          <div class="empty-state" id="wLast"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LOG RUN ═══ -->
+  <div id="view-log-run" class="hidden">
+    <div class="form-section" style="max-width:560px">
+      <h2>Log Run</h2>
+      <div class="card">
+        <div class="form-grid">
+          <div class="form-grid form-grid-2">
+            <div class="form-group"><label>Date</label><input type="date" id="rDate" class="form-input"></div>
+            <div class="form-group">
+              <label>Route</label>
+              <div style="display:flex;gap:6px">
+                <select id="rRoute" class="form-input" style="flex:1"></select>
+                <button type="button" class="add-new-btn" onclick="toggleAddNew('route')" title="Add new route">+</button>
+              </div>
+              <div id="addRouteRow" class="add-new-row hidden">
+                <input type="text" id="newRouteInput" class="form-input" placeholder="New route name…" style="font-size:13px;padding:8px 12px">
+                <button type="button" class="add-new-confirm" onclick="confirmAddNew('route')">Add</button>
+                <button type="button" class="add-new-cancel" onclick="toggleAddNew('route')">✕</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-grid form-grid-3">
+            <div class="form-group"><label>Pace (min:sec/mi)</label><input placeholder="8:30" id="rPace" class="form-input"></div>
+            <div class="form-group"><label>Mileage</label><input type="number" step="0.1" placeholder="3.1" id="rMiles" class="form-input"></div>
+            <div class="form-group"><label>Total Time</label><input placeholder="26:21" id="rTime" class="form-input"></div>
+          </div>
+          <div class="form-grid form-grid-2">
+            <div class="form-group">
+              <label>Shoe</label>
+              <div style="display:flex;gap:6px">
+                <select id="rShoe" class="form-input" style="flex:1"></select>
+                <button type="button" class="add-new-btn" onclick="toggleAddNew('shoe')" title="Add new shoe">+</button>
+              </div>
+              <div id="addShoeRow" class="add-new-row hidden">
+                <input type="text" id="newShoeInput" class="form-input" placeholder="New shoe name…" style="font-size:13px;padding:8px 12px">
+                <button type="button" class="add-new-confirm" onclick="confirmAddNew('shoe')">Add</button>
+                <button type="button" class="add-new-cancel" onclick="toggleAddNew('shoe')">✕</button>
+              </div>
+            </div>
+            <div class="form-group"><label>Avg Heart Rate</label><input type="number" placeholder="155" id="rHR" class="form-input"></div>
+          </div>
+          <div class="form-group"><label>Notes</label><input placeholder="Weather, effort, how it felt..." id="rNotes" class="form-input"></div>
+          <button class="form-submit" onclick="addRun()">Save Run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ INSIGHTS ═══ -->
+  <div id="view-insights" class="hidden">
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:20px;font-family:'JetBrains Mono',monospace">Insights & Outliers</h2>
+    <div class="card">
+      <div class="card-title">📊 YEAR-OVER-YEAR WEIGHT</div>
+      <div class="yoy-grid" id="yoyGrid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🏃 YEAR-OVER-YEAR PACE</div>
+      <div class="yoy-grid" id="yoyPaceGrid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📏 YEAR-OVER-YEAR MILEAGE</div>
+      <div class="yoy-grid" id="yoyMileGrid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">👟 SHOE BREAKDOWN</div>
+      <div style="overflow-x:auto"><table class="run-table" id="shoeTable"><thead><tr><th>Shoe</th><th>Runs</th><th>Total Miles</th><th>Avg Pace</th><th>Best Pace</th><th>Avg Distance</th></tr></thead><tbody id="shoeTableBody"></tbody></table></div>
+    </div>
+    <div class="card collapsible">
+      <div class="card-title collapsible-toggle" onclick="toggleCollapse(this)"><span class="collapse-arrow">▸</span> ⚡ WEIGHT OUTLIERS</div>
+      <div class="collapsible-body collapsed" id="weightOutliers"></div>
+    </div>
+    <div class="card collapsible">
+      <div class="card-title collapsible-toggle" onclick="toggleCollapse(this)"><span class="collapse-arrow">▸</span> 🔥 NOTABLY FAST RUNS</div>
+      <div class="collapsible-body collapsed" id="paceOutliers"></div>
+    </div>
+    <div class="card collapsible" id="runLogCard">
+      <div class="card-title collapsible-toggle" onclick="toggleCollapse(this)"><span class="collapse-arrow">▸</span> 📋 RUN LOG</div>
+      <div style="overflow-x:auto"><table class="run-table"><thead><tr><th>Date</th><th>Route</th><th>Pace</th><th>Miles</th><th>Shoe</th><th>HR</th><th>Notes</th></tr></thead><tbody id="runLogPreview"></tbody></table></div>
+      <div class="collapsible-body collapsed"><div style="overflow-x:auto"><table class="run-table"><tbody id="runLogBody"></tbody></table></div></div>
+    </div>
+    </div>
+  </div>
+  <div id="view-health" class="hidden">
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:20px;font-family:'JetBrains Mono',monospace">Health — Oura Ring</h2>
+    <div id="health-loading" style="text-align:center;padding:40px 0;color:var(--dim2);display:none">⏳ Fetching latest data from Oura…</div>
+    <div id="health-content">
+    <div class="stats-grid" id="health-stats-grid"></div>
+    <div class="card">
+      <div class="card-title">💓 HRV TREND <span style="color:#10b981">● avg HRV (ms)</span> <span style="color:var(--dim2)">● 7-day avg</span></div>
+      <div class="chart-wrap"><canvas id="hrvChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🛏️ SLEEP STAGES <span style="color:#6366f1">● deep</span> <span style="color:#06b6d4">● REM</span> <span style="color:#94a3b8">● light</span> <span style="color:#ef4444">● awake</span></div>
+      <div class="chart-wrap"><canvas id="stagesChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">😴 TOTAL SLEEP <span style="color:var(--accent2)">● hours</span> <span style="color:var(--dim2)">● 7-day avg</span></div>
+      <div class="chart-wrap"><canvas id="sleepChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">❤️ RESTING HEART RATE <span style="color:var(--accent)">● avg</span> <span style="color:var(--orange)">● lowest</span></div>
+      <div class="chart-wrap"><canvas id="hrChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🌡️ TEMPERATURE DEVIATION <span style="color:#a855f7">°C from baseline</span></div>
+      <div class="chart-wrap" style="height:220px"><canvas id="tempChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🫁 RESPIRATORY RATE <span style="color:var(--green)">breaths/min</span></div>
+      <div class="chart-wrap" style="height:220px"><canvas id="respChart"></canvas></div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ═══ STRAVA ═══ -->
+  <div id="view-strava" class="hidden">
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:20px;font-family:'JetBrains Mono',monospace">🔶 Strava</h2>
+    <div id="strava-loading" style="text-align:center;padding:40px 0;color:var(--dim2)">⏳ Syncing with Strava…</div>
+    <div id="strava-content" style="opacity:0.3">
+      <div class="stats-grid" id="strava-stats-grid"></div>
+      <div class="card">
+        <div class="card-title">📈 STRAVA PACE TREND <span style="color:#fc4c02">● pace (min/mi)</span> <span style="color:var(--dim2)">● 7-run avg</span></div>
+        <div class="chart-wrap"><canvas id="stravaPaceChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📏 STRAVA WEEKLY MILEAGE <span style="color:#fc4c02">● miles</span></div>
+        <div class="chart-wrap"><canvas id="stravaWeeklyChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💓 STRAVA HEART RATE <span style="color:#ef4444">● avg HR</span> <span style="color:#ff6b6b">● max HR</span> <span style="color:var(--dim2)">● 7-run avg</span></div>
+        <div class="chart-wrap"><canvas id="stravaHRChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔥 SUFFER SCORE <span style="color:#fc4c02">● relative effort</span> <span style="color:var(--dim2)">● 7-run avg</span></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="stravaSufferChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">⚡ SPEED <span style="color:#06b6d4">● avg mph</span> <span style="color:#22d3ee">● max mph</span></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="stravaSpeedChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">❤️‍🔥 HEART RATE ZONES <span style="color:var(--dim2)">click a run to load zones</span></div>
+        <div id="strava-zones-select" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="stravaZonesChart"></canvas></div>
+        <div id="strava-zones-loading" style="text-align:center;padding:20px 0;color:var(--dim2);display:none">⏳ Loading zones...</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🗺️ GPS ROUTE MAP <span style="color:var(--dim2)">click a run to view route</span></div>
+        <div id="strava-map-select" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"></div>
+        <div id="strava-map" style="height:350px;border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.03)"></div>
+      </div>
+      <div class="card collapsible">
+        <div class="card-title collapsible-toggle" onclick="toggleCollapse(this)"><span class="collapse-arrow open">▸</span> 📋 STRAVA ACTIVITY LOG</div>
+        <div class="collapsible-body">
+          <div style="overflow-x:auto"><table class="run-table"><thead><tr><th>Date</th><th>Name</th><th>Pace</th><th>Miles</th><th>Time</th><th>HR</th><th>Elevation</th></tr></thead><tbody id="stravaLogBody"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+// ═══ SUPABASE ═══
+const SUPABASE_URL='https://bjbqkwtnobrgmgqirpdh.supabase.co';
+const SUPABASE_KEY='sb_publishable_bKEW0adPqNbHBqD4mX3_Yg_KhOQjYsA';
+const sbHeaders={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'};
+let lastSyncTime=null;
+let syncStatus={weights:0,runs:0,strava:0,ok:false};
+
+function updateSyncUI(){
+  const el=document.getElementById('supabase-status-text');
+  const det=document.getElementById('supabase-details');
+  if(!el) return;
+  if(syncStatus.ok){
+    const timeStr=lastSyncTime?lastSyncTime.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit'}):'—';
+    const dateStr=lastSyncTime?lastSyncTime.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+    el.innerHTML='<span style="color:#22c55e">Connected</span>';
+    det.innerHTML='📊 '+syncStatus.weights+' weights · '+syncStatus.runs+' runs · '+syncStatus.strava+' strava runs<br>🕐 Last synced: '+dateStr+' '+timeStr;
+  }else{
+    el.innerHTML='<span style="color:#ef4444">Offline</span> — using local data';
+    det.innerHTML='⚠️ Could not reach Supabase. Data saved locally.';
+  }
+}
+
+async function sbFetch(table,method,body,query=''){
+  const url=SUPABASE_URL+'/rest/v1/'+table+query;
+  const opts={method,headers:{...sbHeaders}};
+  if(method==='GET') opts.headers['Prefer']='';
+  if(body) opts.body=JSON.stringify(body);
+  if(method==='POST') opts.headers['Prefer']='return=minimal,resolution=merge-duplicates';
+  const r=await fetch(url,opts);
+  if(method==='GET') return r.json();
+  return r;
+}
+
+async function sbLoadWeights(){
+  try{
+    const data=await sbFetch('weights','GET',null,'?select=date,weight&order=date.asc');
+    if(data.length>0) return data.map(r=>({date:r.date,weight:r.weight}));
+  }catch(e){console.warn('Supabase weights load failed:',e);}
+  return null;
+}
+
+async function sbLoadRuns(){
+  try{
+    const data=await sbFetch('runs','GET',null,'?select=*&order=date.asc');
+    if(data.length>0) return data.map(r=>({
+      date:r.date||'',route:r.route||'',pace:r.pace||'',mileage:r.mileage?String(r.mileage):'',
+      time:r.time||'',shoe:r.shoe||'',avgHR:r.avg_hr||'',notes:r.notes||'',
+      source:r.source||'manual',stravaId:r.strava_id||null,elevation:r.elevation||0,
+      sufferScore:r.suffer_score||0,maxHR:r.max_hr||0,avgSpeed:r.avg_speed||0,
+      maxSpeed:r.max_speed||0,calories:r.calories||0,polyline:r.polyline||'',
+      startTime:r.start_time||'',movingTime:r.moving_time||0,elapsedTime:r.elapsed_time||0,kudos:r.kudos||0
+    }));
+  }catch(e){console.warn('Supabase runs load failed:',e);}
+  return null;
+}
+
+async function sbSaveWeight(d,w){
+  try{await sbFetch('weights','POST',{date:d,weight:w});lastSyncTime=new Date();syncStatus.weights++;syncStatus.ok=true;updateSyncUI();}catch(e){console.warn('Supabase weight save failed:',e);}
+}
+
+async function sbSaveRun(run){
+  try{
+    const row={date:run.date,route:run.route,pace:run.pace,mileage:parseFloat(run.mileage)||null,
+      time:run.time,shoe:run.shoe,avg_hr:run.avgHR,notes:run.notes,source:run.source||'manual',
+      strava_id:run.stravaId||null,elevation:run.elevation||null,suffer_score:run.sufferScore||null,
+      max_hr:run.maxHR||null,avg_speed:run.avgSpeed||null,max_speed:run.maxSpeed||null,
+      calories:run.calories||null,polyline:run.polyline||null,start_time:run.startTime||null,
+      moving_time:run.movingTime||null,elapsed_time:run.elapsedTime||null,kudos:run.kudos||null};
+    await sbFetch('runs','POST',row);
+    lastSyncTime=new Date();syncStatus.runs++;syncStatus.ok=true;updateSyncUI();
+  }catch(e){console.warn('Supabase run save failed:',e);}
+}
+
+async function sbSeedWeights(wArr){
+  console.log('Seeding '+wArr.length+' weights to Supabase...');
+  const batch=wArr.map(w=>({date:w.d,weight:w.w}));
+  // Batch in chunks of 500
+  for(let i=0;i<batch.length;i+=500){
+    await sbFetch('weights','POST',batch.slice(i,i+500));
+  }
+  console.log('Weights seeded.');
+}
+
+async function sbSeedRuns(rArr){
+  console.log('Seeding '+rArr.length+' runs to Supabase...');
+  const batch=rArr.map(r=>({date:r.date||r.d,route:r.route||r.r||'',pace:r.pace||r.p||'',
+    mileage:parseFloat(r.mileage||r.m)||null,time:r.time||r.t||'',shoe:r.shoe||r.s||'',
+    avg_hr:r.avgHR||r.h||'',notes:r.notes||r.n||'',source:r.source||'manual',
+    strava_id:r.stravaId||null,elevation:r.elevation||null,suffer_score:r.sufferScore||null,
+    max_hr:r.maxHR||null,avg_speed:r.avgSpeed||null,max_speed:r.maxSpeed||null,
+    calories:r.calories||null,polyline:r.polyline||null,start_time:r.startTime||null,
+    moving_time:r.movingTime||null,elapsed_time:r.elapsedTime||null,kudos:r.kudos||null}));
+  for(let i=0;i<batch.length;i+=500){
+    await sbFetch('runs','POST',batch.slice(i,i+500));
+  }
+  console.log('Runs seeded.');
+}
+
+async function sbSaveStravaRuns(stravaArr){
+  if(!stravaArr.length) return;
+  console.log('Saving '+stravaArr.length+' Strava runs to Supabase...');
+  const batch=stravaArr.map(r=>({date:r.date,route:r.route,pace:r.pace,mileage:parseFloat(r.mileage)||null,
+    time:r.time,shoe:r.shoe,avg_hr:r.avgHR,notes:r.notes,source:'strava',
+    strava_id:r.stravaId,elevation:r.elevation||null,suffer_score:r.sufferScore||null,
+    max_hr:r.maxHR||null,avg_speed:r.avgSpeed||null,max_speed:r.maxSpeed||null,
+    calories:r.calories||null,polyline:r.polyline||null,start_time:r.startTime||null,
+    moving_time:r.movingTime||null,elapsed_time:r.elapsedTime||null,kudos:r.kudos||null}));
+  for(let i=0;i<batch.length;i+=500){
+    await sbFetch('runs','POST',batch.slice(i,i+500));
+  }
+  console.log('Strava runs saved to Supabase.');
+}
+
+// ═══ DATA ═══
+const W0=[];
+
+const OURA_TOKEN='BRGYQU6WHYZISN3PFQBYEA34C2AMPPRD';
+
+// ═══ STRAVA INTEGRATION ═══
+const STRAVA_CLIENT_ID='203107';
+const STRAVA_CLIENT_SECRET='46a7284a7289902bf7fcdb4e3279cd07d2db6546';
+let STRAVA_REFRESH='a77cee7e090bf48afa8755f3b0ccabf28d3ecbd3';
+let STRAVA_ACCESS='4ce42bc74918f7fcf90dbb5ea00fb35ee8b0dce1';
+let stravaLoaded=false;
+let stravaRuns=[];
+
+const STRAVA_PROXY='https://stride-proxy.vercel.app/api/strava';
+
+async function refreshStravaToken(){
+  try{
+    const r=await fetch(STRAVA_PROXY+'?action=token&client_id='+STRAVA_CLIENT_ID+'&client_secret='+STRAVA_CLIENT_SECRET+'&refresh_token='+STRAVA_REFRESH);
+    if(!r.ok) throw new Error('Token refresh failed: '+r.status);
+    const d=await r.json();
+    STRAVA_ACCESS=d.access_token;
+    if(d.refresh_token) STRAVA_REFRESH=d.refresh_token;
+    return true;
+  }catch(e){console.warn('Strava token refresh:',e);return false;}
+}
+
+async function fetchStravaActivities(){
+  if(stravaLoaded) return;
+  try{
+    await refreshStravaToken();
+    const allActs=[];
+    let page=1;
+    while(true){
+      const r=await fetch(STRAVA_PROXY+'?action=activities&page='+page+'&token='+STRAVA_ACCESS);
+      if(!r.ok) throw new Error('Strava API: '+r.status);
+      const acts=await r.json();
+      if(!acts.length) break;
+      allActs.push(...acts);
+      page++;
+      if(page>10) break;
+    }
+    // Filter runs only and convert to STRIDE format
+    stravaRuns=allActs.filter(a=>a.type==='Run'||a.sport_type==='Run').map(a=>{
+      const d=a.start_date_local?.slice(0,10)||'';
+      const mi=(a.distance/1609.34);
+      const totalSec=a.moving_time;
+      const paceSec=totalSec/mi;
+      const pMin=Math.floor(paceSec/60);
+      const pSec=Math.round(paceSec%60);
+      const pace=pMin+':'+(pSec<10?'0':'')+pSec;
+      const tMin=Math.floor(totalSec/60);
+      const tSec=totalSec%60;
+      const time=tMin+'m '+tSec+'s';
+      const hr=a.average_heartrate?Math.round(a.average_heartrate):'';
+      return{date:d,route:a.name||'Strava Run',pace:pace,mileage:mi.toFixed(2),time:time,shoe:'',avgHR:hr?String(hr):'',notes:'🔶 Strava',source:'strava',stravaId:a.id,
+        elevation:a.total_elevation_gain?Math.round(a.total_elevation_gain*3.281):0,
+        sufferScore:a.suffer_score||0,
+        maxHR:a.max_heartrate?Math.round(a.max_heartrate):0,
+        avgSpeed:a.average_speed||0,
+        maxSpeed:a.max_speed||0,
+        calories:a.calories||0,
+        polyline:a.map?.summary_polyline||'',
+        startTime:a.start_date_local||'',
+        movingTime:a.moving_time||0,
+        elapsedTime:a.elapsed_time||0,
+        kudos:a.kudos_count||0};
+    });
+    stravaLoaded=true;
+    mergeStravaRuns();
+    console.log('Strava: loaded '+stravaRuns.length+' runs');
+  }catch(e){console.warn('Strava fetch failed:',e);}
+}
+
+function mergeStravaRuns(){
+  // Add Strava runs that don't already exist (by date + similar mileage)
+  const existingDates=new Set(runs.map(r=>r.date));
+  let added=0;
+  stravaRuns.forEach(sr=>{
+    // Check if we already have a run on this date with similar mileage
+    const existing=runs.find(r=>r.date===sr.date && Math.abs(parseFloat(r.mileage)-parseFloat(sr.mileage))<0.5);
+    if(!existing){
+      runs.push(sr);
+      added++;
+    }
+  });
+  if(added>0){
+    runs.sort((a,b)=>a.date.localeCompare(b.date));
+    console.log('Strava: merged '+added+' new runs');
+  }
+}
+let OURA=[];
+let ouraLoaded=false;
+async function fetchOura(){
+  if(ouraLoaded) return;
+  const hdr={Authorization:'Bearer '+OURA_TOKEN};
+  const end=new Date().toISOString().slice(0,10);
+  const start='2024-01-01';
+  try{
+    const [slRes,hrRes,tmpRes]=await Promise.all([
+      fetch('https://api.ouraring.com/v2/usercollection/daily_sleep?start_date='+start+'&end_date='+end,{headers:hdr}),
+      fetch('https://api.ouraring.com/v2/usercollection/daily_cardiovascular_age?start_date='+start+'&end_date='+end,{headers:hdr}).catch(()=>null),
+      fetch('https://api.ouraring.com/v2/usercollection/sleep?start_date='+start+'&end_date='+end,{headers:hdr})
+    ]);
+    const sleepDaily=slRes.ok?await slRes.json():{data:[]};
+    const sleepPeriods=tmpRes.ok?await tmpRes.json():{data:[]};
+    // Build lookup from sleep periods for HR, temp, respiratory
+    const periodMap={};
+    for(const p of sleepPeriods.data||[]){
+      const d=p.day;
+      if(!d) continue;
+      if(!periodMap[d]||p.type==='long_sleep') periodMap[d]=p;
+    }
+    const result=[];
+    for(const s of sleepDaily.data||[]){
+      const d=s.day;
+      if(!d) continue;
+      const dur=s.contributors?.total_sleep;
+      const totalSec=s.timestamp?null: (periodMap[d]?.total_sleep_duration||null);
+      const sl=totalSec?Math.round(totalSec/60):null;
+      const period=periodMap[d]||{};
+      const entry={d};
+      // Total sleep in minutes
+      if(sl) entry.sl=sl;
+      else if(period.total_sleep_duration) entry.sl=Math.round(period.total_sleep_duration/60);
+      // Heart rate
+      if(period.average_heart_rate) entry.ah=Math.round(period.average_heart_rate*10)/10;
+      if(period.lowest_heart_rate) entry.lh=period.lowest_heart_rate;
+      // Temperature
+      if(period.readiness?.temperature_deviation!=null) entry.tp=Math.round(period.readiness.temperature_deviation*100)/100;
+      else if(period.temperature_deviation!=null) entry.tp=Math.round(period.temperature_deviation*100)/100;
+      // Respiratory rate
+      if(period.average_breath) entry.rr=Math.round(period.average_breath*100)/100;
+      if(period.average_hrv) entry.hv=Math.round(period.average_hrv);
+      if(period.rem_sleep_duration) entry.rm=Math.round(period.rem_sleep_duration/60);
+      if(period.deep_sleep_duration) entry.dp=Math.round(period.deep_sleep_duration/60);
+      if(period.light_sleep_duration) entry.lt=Math.round(period.light_sleep_duration/60);
+      if(period.awake_time) entry.aw=Math.round(period.awake_time/60);
+      if(entry.sl) result.push(entry);
+    }
+    if(result.length>10){OURA=result;ouraLoaded=true;console.log('Oura API: loaded '+result.length+' days');return;}
+  }catch(e){console.warn('Oura API error, trying v2 sleep endpoint directly',e);}
+  // Fallback: try /v2/usercollection/sleep directly for all data
+  try{
+    const r=await fetch('https://api.ouraring.com/v2/usercollection/sleep?start_date='+start+'&end_date='+end,{headers:hdr});
+    if(!r.ok) throw new Error(r.status);
+    const data=await r.json();
+    const byDay={};
+    for(const p of data.data||[]){
+      const d=p.day;if(!d)continue;
+      if(!byDay[d]||p.type==='long_sleep') byDay[d]=p;
+    }
+    const result=[];
+    for(const[d,p]of Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]))){
+      const entry={d};
+      if(p.total_sleep_duration) entry.sl=Math.round(p.total_sleep_duration/60);
+      if(p.average_heart_rate) entry.ah=Math.round(p.average_heart_rate*10)/10;
+      if(p.lowest_heart_rate) entry.lh=p.lowest_heart_rate;
+      if(p.temperature_deviation!=null) entry.tp=Math.round(p.temperature_deviation*100)/100;
+      if(p.average_breath) entry.rr=Math.round(p.average_breath*100)/100;
+      if(p.average_hrv) entry.hv=Math.round(p.average_hrv);
+      if(p.rem_sleep_duration) entry.rm=Math.round(p.rem_sleep_duration/60);
+      if(p.deep_sleep_duration) entry.dp=Math.round(p.deep_sleep_duration/60);
+      if(p.light_sleep_duration) entry.lt=Math.round(p.light_sleep_duration/60);
+      if(p.awake_time) entry.aw=Math.round(p.awake_time/60);
+      if(entry.sl) result.push(entry);
+    }
+    if(result.length>10){OURA=result;ouraLoaded=true;console.log('Oura API fallback: loaded '+result.length+' days');return;}
+  }catch(e){console.warn('Oura API fallback failed',e);}
+  console.warn('Oura API: using embedded data');
+  OURA=OURA_FALLBACK;ouraLoaded=true;
+}
+
+const OURA_FALLBACK=[{"d":"2024-01-17","sl":442,"ah":55.5,"lh":50,"tp":-0.1,"rr":12.12,"hv":95,"rm":120,"dp":115,"lt":208,"aw":52},{"d":"2024-01-18","sl":411,"ah":58.0,"lh":54,"tp":-0.47,"rr":12.38,"hv":73,"rm":116,"dp":120,"lt":176,"aw":78},{"d":"2024-01-19","sl":454,"ah":63.5,"lh":54,"tp":-0.32,"rr":12.75,"hv":48,"rm":85,"dp":110,"lt":258,"aw":67},{"d":"2024-01-20","sl":436,"ah":74.8,"lh":65,"tp":1.01,"rr":14.12,"hv":23,"rm":62,"dp":76,"lt":299,"aw":119},{"d":"2024-01-21","sl":478,"ah":55.4,"lh":49,"tp":-0.68,"rr":12.25,"hv":97,"rm":91,"dp":101,"lt":286,"aw":58},{"d":"2024-01-22","sl":440,"ah":56.2,"lh":50,"tp":-0.38,"rr":12.25,"hv":90,"rm":111,"dp":121,"lt":208,"aw":61},{"d":"2024-01-23","sl":433,"ah":58.5,"lh":52,"tp":-0.35,"rr":12.5,"hv":73,"rm":72,"dp":106,"lt":256,"aw":93},{"d":"2024-01-24","sl":420,"ah":62.7,"lh":57,"tp":-0.14,"rr":12.25,"hv":54,"rm":116,"dp":95,"lt":208,"aw":116},{"d":"2024-01-25","sl":446,"ah":60.5,"lh":54,"tp":-0.31,"rr":12.12,"hv":64,"rm":110,"dp":90,"lt":246,"aw":48},{"d":"2024-01-26","sl":459,"ah":61.8,"lh":48,"tp":-0.11,"rr":13.0,"hv":58,"rm":142,"dp":120,"lt":196,"aw":82},{"d":"2024-01-27","sl":464,"ah":60.2,"lh":54,"tp":-0.18,"rr":12.75,"hv":69,"rm":110,"dp":119,"lt":234,"aw":85},{"d":"2024-01-28","sl":457,"ah":60.5,"lh":54,"tp":-0.19,"rr":12.62,"hv":61,"rm":142,"dp":132,"lt":184,"aw":69},{"d":"2024-01-29","sl":424,"ah":59.4,"lh":55,"tp":-0.35,"rr":12.38,"hv":71,"rm":85,"dp":84,"lt":254,"aw":38},{"d":"2024-01-30","sl":452,"ah":60.5,"lh":53,"tp":-0.27,"rr":12.38,"hv":62,"rm":134,"dp":116,"lt":204,"aw":43},{"d":"2024-01-31","sl":448,"ah":63.7,"lh":56,"tp":-0.13,"rr":12.75,"hv":57,"rm":72,"dp":72,"lt":304,"aw":92},{"d":"2024-02-01","sl":401,"ah":60.9,"lh":56,"tp":-0.02,"rr":12.38,"hv":65,"rm":105,"dp":102,"lt":194,"aw":113},{"d":"2024-02-02","sl":436,"ah":57.8,"lh":51,"tp":-0.23,"rr":12.88,"hv":76,"rm":118,"dp":102,"lt":215,"aw":70},{"d":"2024-02-03","sl":470,"ah":61.6,"lh":55,"tp":-0.23,"rr":12.5,"hv":61,"rm":136,"dp":84,"lt":250,"aw":74},{"d":"2024-02-04","sl":454,"ah":60.1,"lh":54,"tp":-0.17,"rr":12.5,"hv":65,"rm":93,"dp":88,"lt":272,"aw":68},{"d":"2024-02-05","sl":446,"ah":58.9,"lh":52,"tp":-0.48,"rr":12.25,"hv":71,"rm":79,"dp":122,"lt":245,"aw":58},{"d":"2024-02-06","sl":442,"ah":64.8,"lh":59,"tp":-0.13,"rr":12.38,"hv":38,"rm":120,"dp":96,"lt":226,"aw":86},{"d":"2024-02-07","sl":435,"ah":61.3,"lh":55,"tp":-0.21,"rr":12.25,"hv":55,"rm":98,"dp":90,"lt":248,"aw":68},{"d":"2024-02-08","sl":422,"ah":60.2,"lh":55,"tp":-0.23,"rr":12.38,"hv":59,"rm":94,"dp":89,"lt":238,"aw":55},{"d":"2024-02-09","sl":448,"ah":62.7,"lh":55,"tp":-0.06,"rr":12.12,"hv":54,"rm":108,"dp":112,"lt":228,"aw":60},{"d":"2024-02-10","sl":446,"ah":64.6,"lh":59,"tp":0.01,"rr":12.12,"hv":37,"rm":115,"dp":110,"lt":222,"aw":90},{"d":"2024-02-11","sl":467,"ah":59.5,"lh":54,"tp":-0.16,"rr":12.25,"hv":70,"rm":110,"dp":99,"lt":258,"aw":79},{"d":"2024-02-12","sl":438,"ah":62.5,"lh":58,"tp":-0.12,"rr":12.38,"hv":53,"rm":120,"dp":110,"lt":208,"aw":86},{"d":"2024-02-13","sl":421,"ah":60.4,"lh":54,"tp":-0.15,"rr":12.0,"hv":60,"rm":128,"dp":74,"lt":219,"aw":80},{"d":"2024-02-14","sl":430,"ah":63.9,"lh":57,"tp":-0.11,"rr":12.38,"hv":46,"rm":82,"dp":98,"lt":250,"aw":56},{"d":"2024-02-15","sl":442,"ah":59.6,"lh":52,"tp":-0.14,"rr":12.5,"hv":72,"rm":111,"dp":114,"lt":216,"aw":86},{"d":"2024-02-16","sl":442,"ah":63.2,"lh":55,"tp":0.13,"rr":12.75,"hv":43,"rm":114,"dp":85,"lt":244,"aw":56},{"d":"2024-02-17","sl":436,"ah":56.4,"lh":49,"tp":-0.32,"rr":12.38,"hv":91,"rm":110,"dp":94,"lt":232,"aw":112},{"d":"2024-02-18","sl":437,"ah":59.0,"lh":53,"tp":-0.19,"rr":12.25,"hv":67,"rm":112,"dp":118,"lt":207,"aw":72},{"d":"2024-02-19","sl":430,"ah":58.0,"lh":51,"tp":-0.07,"rr":12.38,"hv":74,"rm":90,"dp":105,"lt":234,"aw":77},{"d":"2024-02-20","sl":438,"ah":59.4,"lh":52,"tp":-0.05,"rr":12.25,"hv":57,"rm":114,"dp":116,"lt":208,"aw":58},{"d":"2024-02-21","sl":432,"ah":60.8,"lh":54,"tp":0.03,"rr":12.12,"hv":62,"rm":108,"dp":88,"lt":236,"aw":72},{"d":"2024-02-22","sl":442,"ah":59.9,"lh":55,"tp":0.12,"rr":12.88,"hv":66,"rm":88,"dp":92,"lt":263,"aw":92},{"d":"2024-02-23","sl":446,"ah":57.4,"lh":51,"tp":-0.14,"rr":12.75,"hv":88,"rm":115,"dp":104,"lt":228,"aw":43},{"d":"2024-02-24","sl":448,"ah":58.2,"lh":51,"tp":0.08,"rr":12.5,"hv":81,"rm":134,"dp":112,"lt":202,"aw":63},{"d":"2024-02-25","sl":436,"ah":56.6,"lh":51,"tp":-0.15,"rr":12.5,"hv":99,"rm":104,"dp":79,"lt":253,"aw":94},{"d":"2024-02-26","sl":414,"ah":54.5,"lh":50,"tp":0.17,"rr":12.62,"hv":100,"rm":92,"dp":102,"lt":220,"aw":87},{"d":"2024-02-27","sl":428,"ah":60.2,"lh":52,"tp":0.24,"rr":12.75,"hv":72,"rm":90,"dp":104,"lt":234,"aw":77},{"d":"2024-02-28","sl":486,"ah":54.8,"lh":47,"tp":-0.2,"rr":12.5,"hv":107,"rm":98,"dp":109,"lt":278,"aw":154},{"d":"2024-02-29","sl":446,"ah":55.3,"lh":49,"tp":-0.15,"rr":12.62,"hv":90,"rm":92,"dp":123,"lt":231,"aw":156},{"d":"2024-03-01","sl":453,"ah":55.9,"lh":51,"tp":-0.18,"rr":12.5,"hv":94,"rm":111,"dp":70,"lt":272,"aw":52},{"d":"2024-03-02","sl":472,"ah":54.4,"lh":46,"tp":0.13,"rr":12.88,"hv":102,"rm":114,"dp":116,"lt":242,"aw":74},{"d":"2024-03-03","sl":428,"ah":54.1,"lh":46,"tp":-0.24,"rr":12.62,"hv":101,"rm":121,"dp":96,"lt":212,"aw":74},{"d":"2024-03-04","sl":456,"ah":56.6,"lh":51,"tp":0.11,"rr":12.62,"hv":81,"rm":100,"dp":95,"lt":262,"aw":70},{"d":"2024-03-05","sl":463,"ah":53.6,"lh":46,"tp":-0.21,"rr":12.62,"hv":112,"rm":102,"dp":102,"lt":258,"aw":63},{"d":"2024-03-06","sl":461,"ah":57.4,"lh":50,"tp":0.07,"rr":12.75,"hv":92,"rm":104,"dp":108,"lt":250,"aw":76},{"d":"2024-03-07","sl":398,"ah":51.6,"lh":48,"tp":-0.3,"rr":12.5,"hv":107,"rm":99,"dp":108,"lt":192,"aw":84},{"d":"2024-03-08","sl":448,"ah":52.5,"lh":46,"tp":-0.29,"rr":12.5,"hv":121,"rm":106,"dp":103,"lt":238,"aw":56},{"d":"2024-03-09","sl":454,"ah":53.4,"lh":46,"tp":-0.29,"rr":12.38,"hv":111,"rm":96,"dp":92,"lt":266,"aw":46},{"d":"2024-03-10","sl":414,"ah":53.8,"lh":47,"tp":-0.03,"rr":12.5,"hv":113,"rm":107,"dp":117,"lt":190,"aw":131},{"d":"2024-03-11","sl":450,"ah":51.7,"lh":45,"tp":-0.06,"rr":12.62,"hv":104,"rm":118,"dp":116,"lt":217,"aw":47},{"d":"2024-03-12","sl":476,"ah":55.4,"lh":50,"tp":-0.08,"rr":13.0,"hv":95,"rm":88,"dp":114,"lt":274,"aw":88},{"d":"2024-03-13","sl":456,"ah":53.3,"lh":48,"tp":-0.33,"rr":12.38,"hv":107,"rm":97,"dp":142,"lt":216,"aw":112},{"d":"2024-03-14","sl":460,"ah":53.3,"lh":47,"tp":-0.11,"rr":12.38,"hv":105,"rm":99,"dp":91,"lt":270,"aw":84},{"d":"2024-03-15","sl":481,"ah":52.6,"lh":45,"tp":-0.26,"rr":12.62,"hv":113,"rm":106,"dp":114,"lt":261,"aw":59},{"d":"2024-03-16","sl":437,"ah":50.8,"lh":46,"tp":-0.66,"rr":12.88,"hv":118,"rm":118,"dp":86,"lt":234,"aw":51},{"d":"2024-03-17","sl":450,"ah":52.7,"lh":49,"tp":-0.24,"rr":13.12,"hv":105,"rm":90,"dp":94,"lt":266,"aw":106},{"d":"2024-03-18","sl":458,"ah":49.8,"lh":46,"tp":-0.07,"rr":12.62,"hv":103,"rm":101,"dp":116,"lt":242,"aw":53},{"d":"2024-03-19","sl":423,"ah":52.9,"lh":47,"tp":0.03,"rr":12.38,"hv":99,"rm":74,"dp":96,"lt":252,"aw":104},{"d":"2024-03-20","sl":448,"ah":53.1,"lh":48,"tp":-0.35,"rr":11.88,"hv":96,"rm":130,"dp":73,"lt":244,"aw":58},{"d":"2024-03-21","sl":449,"ah":52.0,"lh":47,"tp":-0.36,"rr":12.38,"hv":109,"rm":108,"dp":88,"lt":252,"aw":62},{"d":"2024-03-22","sl":448,"ah":49.4,"lh":45,"tp":-0.46,"rr":12.38,"hv":112,"rm":100,"dp":99,"lt":249,"aw":87},{"d":"2024-03-23","sl":470,"ah":49.8,"lh":44,"tp":-0.12,"rr":12.5,"hv":117,"rm":103,"dp":105,"lt":262,"aw":107},{"d":"2024-03-24","sl":438,"ah":51.0,"lh":45,"tp":-0.51,"rr":12.12,"hv":118,"rm":129,"dp":90,"lt":219,"aw":57},{"d":"2024-03-25","sl":465,"ah":54.0,"lh":47,"tp":0.01,"rr":12.0,"hv":96,"rm":85,"dp":100,"lt":280,"aw":69},{"d":"2024-03-26","sl":380,"ah":57.5,"lh":51,"tp":0.08,"rr":12.25,"hv":92,"rm":70,"dp":91,"lt":220,"aw":110},{"d":"2024-03-27","sl":410,"ah":53.9,"lh":49,"tp":-0.12,"rr":12.25,"hv":99,"rm":130,"dp":97,"lt":183,"aw":94},{"d":"2024-03-28","sl":366,"ah":55.0,"lh":48,"tp":0.08,"rr":12.12,"hv":86,"rm":96,"dp":128,"lt":142,"aw":124},{"d":"2024-03-29","sl":472,"ah":56.6,"lh":50,"tp":0.54,"rr":12.38,"hv":80,"rm":134,"dp":114,"lt":224,"aw":50},{"d":"2024-03-30","sl":493,"ah":51.7,"lh":45,"tp":-0.02,"rr":12.38,"hv":95,"rm":117,"dp":119,"lt":257,"aw":94},{"d":"2024-03-31","sl":434,"ah":53.8,"lh":48,"tp":-0.18,"rr":12.12,"hv":94,"rm":108,"dp":106,"lt":221,"aw":60},{"d":"2024-04-01","sl":480,"ah":57.3,"lh":50,"tp":0.06,"rr":12.0,"hv":63,"rm":124,"dp":82,"lt":274,"aw":56},{"d":"2024-04-02","sl":424,"ah":54.5,"lh":50,"tp":-0.03,"rr":11.88,"hv":90,"rm":116,"dp":78,"lt":230,"aw":55},{"d":"2024-04-03","sl":468,"ah":60.3,"lh":51,"tp":0.31,"rr":12.38,"hv":55,"rm":100,"dp":112,"lt":256,"aw":106},{"d":"2024-04-04","sl":438,"ah":56.7,"lh":52,"tp":0.09,"rr":11.88,"hv":79,"rm":95,"dp":86,"lt":256,"aw":104},{"d":"2024-04-05","sl":473,"ah":61.0,"lh":53,"tp":-0.03,"rr":12.25,"hv":59,"rm":131,"dp":130,"lt":212,"aw":104},{"d":"2024-04-06","sl":446,"ah":56.1,"lh":50,"tp":0.03,"rr":11.88,"hv":85,"rm":114,"dp":103,"lt":228,"aw":38},{"d":"2024-04-07","sl":375,"ah":65.8,"lh":58,"tp":0.29,"rr":12.75,"hv":41,"rm":63,"dp":102,"lt":210,"aw":155},{"d":"2024-04-08","sl":462,"ah":67.0,"lh":55,"tp":0.33,"rr":13.0,"hv":37,"rm":114,"dp":90,"lt":258,"aw":39},{"d":"2024-04-09","sl":358,"ah":62.3,"lh":55,"tp":0.34,"rr":12.62,"hv":56,"rm":74,"dp":106,"lt":176,"aw":135},{"d":"2024-04-10","sl":411,"ah":56.8,"lh":49,"tp":-0.01,"rr":12.38,"hv":85,"rm":90,"dp":110,"lt":212,"aw":74},{"d":"2024-04-11","sl":434,"ah":60.5,"lh":52,"tp":0.01,"rr":12.38,"hv":72,"rm":118,"dp":79,"lt":237,"aw":61},{"d":"2024-04-12","sl":462,"ah":57.9,"lh":51,"tp":-0.15,"rr":12.25,"hv":76,"rm":128,"dp":100,"lt":233,"aw":47},{"d":"2024-04-13","sl":494,"ah":58.1,"lh":53,"tp":-0.14,"rr":12.12,"hv":75,"rm":136,"dp":100,"lt":258,"aw":69},{"d":"2024-04-14","sl":449,"ah":59.4,"lh":54,"tp":0.18,"rr":12.38,"hv":68,"rm":116,"dp":84,"lt":249,"aw":67},{"d":"2024-04-15","sl":440,"ah":59.7,"lh":50,"tp":0.07,"rr":12.5,"hv":66,"rm":100,"dp":114,"lt":224,"aw":56},{"d":"2024-04-16","sl":438,"ah":57.2,"lh":50,"tp":0.24,"rr":12.38,"hv":82,"rm":105,"dp":92,"lt":242,"aw":60},{"d":"2024-04-17","sl":427,"ah":56.4,"lh":51,"tp":0.16,"rr":12.25,"hv":85,"rm":119,"dp":98,"lt":210,"aw":56},{"d":"2024-04-18","sl":412,"ah":55.2,"lh":49,"tp":-0.02,"rr":12.5,"hv":96,"rm":88,"dp":87,"lt":238,"aw":76},{"d":"2024-04-19","sl":424,"ah":58.8,"lh":54,"tp":0.07,"rr":11.88,"hv":62,"rm":102,"dp":90,"lt":231,"aw":88},{"d":"2024-04-20","sl":375,"ah":58.9,"lh":53,"tp":0.2,"rr":12.5,"hv":68,"rm":82,"dp":82,"lt":210,"aw":121},{"d":"2024-04-21","sl":414,"ah":53.5,"lh":48,"tp":-0.05,"rr":12.25,"hv":101,"rm":126,"dp":90,"lt":200,"aw":84},{"d":"2024-04-22","sl":422,"ah":58.1,"lh":52,"tp":0.0,"rr":12.25,"hv":75,"rm":102,"dp":104,"lt":216,"aw":106},{"d":"2024-04-23","sl":435,"ah":55.7,"lh":49,"tp":0.24,"rr":12.75,"hv":95,"rm":108,"dp":108,"lt":219,"aw":51},{"d":"2024-04-24","sl":418,"ah":56.9,"lh":50,"tp":0.02,"rr":12.75,"hv":86,"rm":82,"dp":113,"lt":223,"aw":75},{"d":"2024-04-25","sl":444,"ah":51.2,"lh":46,"tp":-0.11,"rr":12.88,"hv":138,"rm":108,"dp":91,"lt":244,"aw":96},{"d":"2024-04-26","sl":449,"ah":51.9,"lh":45,"tp":-0.05,"rr":12.88,"hv":126,"rm":102,"dp":108,"lt":239,"aw":68},{"d":"2024-04-27","sl":412,"ah":52.4,"lh":48,"tp":-0.28,"rr":12.38,"hv":104,"rm":98,"dp":91,"lt":224,"aw":89},{"d":"2024-04-28","sl":446,"ah":53.4,"lh":48,"tp":-0.04,"rr":12.5,"hv":107,"rm":100,"dp":88,"lt":258,"aw":60},{"d":"2024-04-29","sl":487,"ah":53.0,"lh":48,"tp":-0.24,"rr":12.0,"hv":93,"rm":106,"dp":94,"lt":287,"aw":47},{"d":"2024-04-30","sl":443,"ah":52.3,"lh":46,"tp":-0.08,"rr":12.5,"hv":103,"rm":110,"dp":81,"lt":252,"aw":68},{"d":"2024-05-01","sl":482,"ah":52.8,"lh":47,"tp":-0.4,"rr":12.38,"hv":97,"rm":106,"dp":101,"lt":274,"aw":67},{"d":"2024-05-02","sl":454,"ah":51.3,"lh":46,"tp":-0.19,"rr":12.5,"hv":115,"rm":120,"dp":98,"lt":236,"aw":62},{"d":"2024-05-03","sl":414,"ah":51.0,"lh":46,"tp":-0.03,"rr":12.75,"hv":119,"rm":73,"dp":80,"lt":261,"aw":74},{"d":"2024-05-04","sl":464,"ah":52.6,"lh":48,"tp":-0.12,"rr":12.5,"hv":104,"rm":128,"dp":115,"lt":222,"aw":88},{"d":"2024-05-05","sl":434,"ah":54.0,"lh":49,"tp":0.27,"rr":12.38,"hv":110,"rm":111,"dp":68,"lt":254,"aw":68},{"d":"2024-05-06","sl":456,"ah":52.9,"lh":48,"tp":0.02,"rr":12.0,"hv":98,"rm":109,"dp":84,"lt":262,"aw":87},{"d":"2024-05-07","sl":466,"ah":53.3,"lh":47,"tp":-0.17,"rr":11.88,"hv":101,"rm":120,"dp":90,"lt":256,"aw":63},{"d":"2024-05-08","sl":445,"ah":52.4,"lh":46,"tp":0.05,"rr":12.0,"hv":112,"rm":86,"dp":102,"lt":258,"aw":78},{"d":"2024-05-09","sl":442,"ah":55.2,"lh":48,"tp":-0.01,"rr":12.12,"hv":90,"rm":106,"dp":83,"lt":252,"aw":145},{"d":"2024-05-10","sl":424,"ah":51.5,"lh":45,"tp":-0.31,"rr":12.25,"hv":108,"rm":82,"dp":104,"lt":238,"aw":67},{"d":"2024-05-11","sl":476,"ah":52.1,"lh":47,"tp":-0.25,"rr":12.25,"hv":103,"rm":111,"dp":106,"lt":260,"aw":66},{"d":"2024-05-12","sl":452,"ah":51.7,"lh":46,"tp":-0.13,"rr":12.38,"hv":108,"rm":120,"dp":98,"lt":234,"aw":38},{"d":"2024-05-13","sl":448,"ah":52.8,"lh":46,"tp":-0.41,"rr":12.12,"hv":102,"rm":118,"dp":102,"lt":228,"aw":40},{"d":"2024-05-14","sl":443,"ah":56.2,"lh":46,"tp":-0.25,"rr":12.0,"hv":87,"rm":93,"dp":110,"lt":240,"aw":83},{"d":"2024-05-15","sl":433,"ah":58.5,"lh":51,"tp":0.07,"rr":12.25,"hv":75,"rm":66,"dp":101,"lt":266,"aw":95},{"d":"2024-05-16","sl":380,"ah":57.4,"lh":49,"tp":0.17,"rr":12.5,"hv":82,"rm":92,"dp":101,"lt":186,"aw":94},{"d":"2024-05-17","sl":410,"ah":53.7,"lh":47,"tp":-0.49,"rr":12.62,"hv":104,"rm":130,"dp":133,"lt":148,"aw":72},{"d":"2024-05-18","sl":442,"ah":53.9,"lh":48,"tp":-0.2,"rr":12.0,"hv":102,"rm":102,"dp":91,"lt":250,"aw":40},{"d":"2024-05-19","sl":428,"ah":53.4,"lh":49,"tp":-0.51,"rr":12.38,"hv":94,"rm":124,"dp":86,"lt":216,"aw":67},{"d":"2024-05-20","sl":444,"ah":60.1,"lh":56,"tp":0.14,"rr":12.38,"hv":54,"rm":98,"dp":86,"lt":259,"aw":63},{"d":"2024-05-21","sl":436,"ah":56.8,"lh":50,"tp":0.13,"rr":12.5,"hv":87,"rm":86,"dp":90,"lt":260,"aw":124},{"d":"2024-05-22","sl":446,"ah":52.6,"lh":47,"tp":-0.03,"rr":12.38,"hv":117,"rm":118,"dp":98,"lt":230,"aw":72},{"d":"2024-05-23","sl":452,"ah":56.2,"lh":48,"tp":-0.03,"rr":12.5,"hv":94,"rm":122,"dp":92,"lt":238,"aw":84},{"d":"2024-05-24","sl":436,"ah":56.6,"lh":51,"tp":-0.05,"rr":12.38,"hv":97,"rm":137,"dp":95,"lt":204,"aw":92},{"d":"2024-05-25","sl":464,"ah":53.3,"lh":47,"tp":-0.24,"rr":12.5,"hv":109,"rm":124,"dp":78,"lt":262,"aw":96},{"d":"2024-05-26","sl":406,"ah":50.4,"lh":46,"tp":-0.2,"rr":12.38,"hv":118,"rm":128,"dp":98,"lt":181,"aw":85},{"d":"2024-05-27","sl":469,"ah":51.2,"lh":45,"tp":0.04,"rr":12.62,"hv":101,"rm":89,"dp":128,"lt":252,"aw":80},{"d":"2024-05-28","sl":489,"ah":52.0,"lh":46,"tp":-0.12,"rr":12.5,"hv":105,"rm":132,"dp":126,"lt":231,"aw":96},{"d":"2024-05-29","sl":390,"ah":54.2,"lh":48,"tp":0.08,"rr":12.5,"hv":94,"rm":76,"dp":98,"lt":217,"aw":136},{"d":"2024-05-30","sl":504,"ah":50.4,"lh":44,"tp":0.01,"rr":12.5,"hv":128,"rm":114,"dp":108,"lt":282,"aw":51},{"d":"2024-05-31","sl":474,"ah":54.8,"lh":51,"tp":-0.12,"rr":12.38,"hv":89,"rm":128,"dp":91,"lt":256,"aw":31},{"d":"2024-06-01","sl":498,"ah":52.3,"lh":46,"tp":0.11,"rr":12.0,"hv":106,"rm":122,"dp":94,"lt":282,"aw":54},{"d":"2024-06-02","sl":452,"ah":52.5,"lh":46,"tp":-0.3,"rr":12.38,"hv":110,"rm":128,"dp":102,"lt":222,"aw":59},{"d":"2024-06-03","sl":430,"ah":50.1,"lh":44,"tp":-0.03,"rr":12.75,"hv":104,"rm":87,"dp":113,"lt":230,"aw":111},{"d":"2024-06-04","sl":444,"ah":53.8,"lh":48,"tp":0.16,"rr":12.38,"hv":79,"rm":73,"dp":115,"lt":256,"aw":113},{"d":"2024-06-05","sl":457,"ah":57.4,"lh":51,"tp":-0.04,"rr":12.62,"hv":64,"rm":103,"dp":104,"lt":250,"aw":48},{"d":"2024-06-06","sl":450,"ah":57.2,"lh":52,"tp":-0.04,"rr":12.38,"hv":64,"rm":136,"dp":90,"lt":224,"aw":44},{"d":"2024-06-07","sl":472,"ah":57.2,"lh":49,"tp":-0.09,"rr":12.62,"hv":74,"rm":104,"dp":106,"lt":262,"aw":39},{"d":"2024-06-08","sl":456,"ah":50.4,"lh":45,"tp":-0.21,"rr":12.62,"hv":118,"rm":132,"dp":88,"lt":236,"aw":66},{"d":"2024-06-09","sl":430,"ah":55.4,"lh":48,"tp":-0.02,"rr":12.62,"hv":90,"rm":78,"dp":118,"lt":234,"aw":113},{"d":"2024-06-10","sl":448,"ah":55.8,"lh":51,"tp":0.04,"rr":13.0,"hv":92,"rm":98,"dp":110,"lt":241,"aw":64},{"d":"2024-06-11","sl":456,"ah":56.7,"lh":49,"tp":0.3,"rr":12.38,"hv":90,"rm":120,"dp":104,"lt":232,"aw":40},{"d":"2024-06-12","sl":429,"ah":60.4,"lh":54,"tp":0.28,"rr":12.75,"hv":66,"rm":91,"dp":97,"lt":241,"aw":72},{"d":"2024-06-13","sl":452,"ah":55.9,"lh":48,"tp":0.06,"rr":12.5,"hv":95,"rm":106,"dp":118,"lt":228,"aw":87},{"d":"2024-06-14","sl":452,"ah":54.9,"lh":48,"tp":0.04,"rr":12.38,"hv":98,"rm":112,"dp":96,"lt":243,"aw":49},{"d":"2024-06-15","sl":449,"ah":54.0,"lh":47,"tp":-0.01,"rr":12.25,"hv":110,"rm":116,"dp":96,"lt":236,"aw":59},{"d":"2024-06-16","sl":402,"ah":55.1,"lh":47,"tp":0.42,"rr":12.12,"hv":90,"rm":105,"dp":113,"lt":184,"aw":73},{"d":"2024-06-17","sl":462,"ah":54.4,"lh":47,"tp":-0.19,"rr":12.25,"hv":91,"rm":101,"dp":108,"lt":254,"aw":90},{"d":"2024-06-18","sl":470,"ah":49.9,"lh":42,"tp":-0.13,"rr":12.5,"hv":111,"rm":118,"dp":118,"lt":234,"aw":68},{"d":"2024-06-19","sl":435,"ah":55.5,"lh":49,"tp":0.31,"rr":12.5,"hv":90,"rm":100,"dp":92,"lt":242,"aw":53},{"d":"2024-06-20","sl":432,"ah":50.2,"lh":45,"tp":-0.03,"rr":12.62,"hv":115,"rm":98,"dp":112,"lt":223,"aw":88},{"d":"2024-06-21","sl":436,"ah":52.8,"lh":46,"tp":0.07,"rr":12.38,"hv":124,"rm":101,"dp":96,"lt":239,"aw":39},{"d":"2024-06-22","sl":434,"ah":54.1,"lh":49,"tp":-0.02,"rr":12.38,"hv":101,"rm":131,"dp":96,"lt":206,"aw":91},{"d":"2024-06-23","sl":420,"ah":53.1,"lh":48,"tp":-0.03,"rr":12.25,"hv":96,"rm":132,"dp":86,"lt":202,"aw":90},{"d":"2024-06-24","sl":390,"ah":52.8,"lh":46,"tp":0.07,"rr":12.38,"hv":98,"rm":85,"dp":114,"lt":191,"aw":101},{"d":"2024-06-25","sl":424,"ah":55.7,"lh":50,"tp":-0.05,"rr":12.5,"hv":71,"rm":61,"dp":80,"lt":282,"aw":91},{"d":"2024-06-26","sl":440,"ah":53.7,"lh":48,"tp":0.06,"rr":12.38,"hv":99,"rm":84,"dp":98,"lt":258,"aw":109},{"d":"2024-06-27","sl":436,"ah":53.8,"lh":48,"tp":0.07,"rr":12.25,"hv":95,"rm":110,"dp":92,"lt":233,"aw":44},{"d":"2024-06-28","sl":400,"ah":54.1,"lh":48,"tp":0.02,"rr":12.62,"hv":104,"rm":108,"dp":110,"lt":182,"aw":107},{"d":"2024-06-29","sl":444,"ah":53.3,"lh":48,"tp":0.23,"rr":12.75,"hv":93,"rm":123,"dp":103,"lt":218,"aw":43},{"d":"2024-06-30","sl":430,"ah":54.0,"lh":47,"tp":0.01,"rr":13.0,"hv":106,"rm":103,"dp":102,"lt":226,"aw":27},{"d":"2024-07-01","sl":450,"ah":57.7,"lh":50,"tp":0.29,"rr":12.0,"hv":83,"rm":122,"dp":119,"lt":208,"aw":33},{"d":"2024-07-02","sl":428,"ah":59.0,"lh":53,"tp":0.33,"rr":12.0,"hv":67,"rm":112,"dp":107,"lt":209,"aw":61},{"d":"2024-07-03","sl":404,"ah":61.6,"lh":55,"tp":0.17,"rr":12.38,"hv":48,"rm":94,"dp":95,"lt":216,"aw":68},{"d":"2024-07-04","sl":450,"ah":55.3,"lh":50,"tp":0.1,"rr":11.62,"hv":92,"rm":128,"dp":74,"lt":247,"aw":51},{"d":"2024-07-05","sl":403,"ah":53.4,"lh":47,"tp":-0.19,"rr":12.0,"hv":108,"rm":113,"dp":94,"lt":196,"aw":53},{"d":"2024-07-06","sl":438,"ah":49.8,"lh":44,"tp":-0.15,"rr":12.12,"hv":136,"rm":128,"dp":50,"lt":260,"aw":98},{"d":"2024-07-07","sl":358,"ah":52.0,"lh":45,"tp":-0.3,"rr":12.12,"hv":116,"rm":86,"dp":94,"lt":178,"aw":109},{"d":"2024-07-08","sl":460,"ah":49.2,"lh":44,"tp":-0.3,"rr":12.25,"hv":117,"rm":118,"dp":99,"lt":243,"aw":35},{"d":"2024-07-09","sl":460,"ah":57.6,"lh":50,"tp":0.1,"rr":12.12,"hv":74,"rm":132,"dp":118,"lt":210,"aw":37},{"d":"2024-07-10","sl":446,"ah":52.4,"lh":47,"tp":0.2,"rr":12.0,"hv":118,"rm":108,"dp":128,"lt":211,"aw":42},{"d":"2024-07-11","sl":450,"ah":53.4,"lh":47,"tp":-0.15,"rr":12.25,"hv":104,"rm":140,"dp":122,"lt":189,"aw":40},{"d":"2024-07-12","sl":440,"ah":56.7,"lh":51,"tp":0.06,"rr":12.0,"hv":73,"rm":96,"dp":105,"lt":238,"aw":64},{"d":"2024-07-13","sl":445,"ah":54.2,"lh":44,"tp":0.15,"rr":12.38,"hv":109,"rm":104,"dp":106,"lt":234,"aw":74},{"d":"2024-07-14","sl":406,"ah":54.6,"lh":50,"tp":-0.32,"rr":12.25,"hv":100,"rm":85,"dp":92,"lt":229,"aw":88},{"d":"2024-07-15","sl":399,"ah":48.6,"lh":44,"tp":-0.46,"rr":12.5,"hv":124,"rm":122,"dp":87,"lt":190,"aw":85},{"d":"2024-07-16","sl":434,"ah":48.6,"lh":43,"tp":-0.04,"rr":12.38,"hv":123,"rm":90,"dp":102,"lt":241,"aw":34},{"d":"2024-07-17","sl":428,"ah":53.3,"lh":47,"tp":0.04,"rr":12.62,"hv":109,"rm":106,"dp":97,"lt":224,"aw":57},{"d":"2024-07-18","sl":414,"ah":55.3,"lh":47,"tp":0.07,"rr":12.5,"hv":98,"rm":81,"dp":92,"lt":240,"aw":90},{"d":"2024-07-19","sl":416,"ah":54.0,"lh":49,"tp":-0.1,"rr":12.5,"hv":107,"rm":112,"dp":121,"lt":183,"aw":87},{"d":"2024-07-20","sl":426,"ah":53.7,"lh":47,"tp":0.1,"rr":12.12,"hv":118,"rm":84,"dp":92,"lt":252,"aw":97},{"d":"2024-07-21","sl":405,"ah":51.0,"lh":46,"tp":0.02,"rr":12.12,"hv":127,"rm":108,"dp":74,"lt":223,"aw":75},{"d":"2024-07-22","sl":427,"ah":51.1,"lh":45,"tp":0.08,"rr":12.12,"hv":112,"rm":114,"dp":99,"lt":214,"aw":58},{"d":"2024-07-23","sl":440,"ah":52.2,"lh":46,"tp":-0.11,"rr":12.38,"hv":113,"rm":122,"dp":98,"lt":220,"aw":46},{"d":"2024-07-24","sl":445,"ah":49.5,"lh":43,"tp":-0.11,"rr":12.38,"hv":128,"rm":136,"dp":86,"lt":224,"aw":37},{"d":"2024-07-25","sl":434,"ah":49.9,"lh":43,"tp":-0.08,"rr":12.25,"hv":120,"rm":122,"dp":92,"lt":220,"aw":54},{"d":"2024-07-26","sl":414,"ah":51.5,"lh":47,"tp":-0.02,"rr":12.5,"hv":100,"rm":100,"dp":108,"lt":206,"aw":46},{"d":"2024-07-27","sl":422,"ah":52.8,"lh":48,"tp":0.05,"rr":12.38,"hv":105,"rm":116,"dp":96,"lt":210,"aw":80},{"d":"2024-07-28","sl":400,"ah":53.1,"lh":47,"tp":0.21,"rr":12.38,"hv":120,"rm":106,"dp":117,"lt":177,"aw":75},{"d":"2024-07-29","sl":427,"ah":52.1,"lh":48,"tp":0.12,"rr":12.25,"hv":116,"rm":115,"dp":122,"lt":190,"aw":41},{"d":"2024-07-30","sl":428,"ah":52.9,"lh":47,"tp":-0.1,"rr":12.0,"hv":114,"rm":96,"dp":100,"lt":232,"aw":46},{"d":"2024-07-31","sl":456,"ah":53.2,"lh":48,"tp":-0.18,"rr":12.38,"hv":103,"rm":91,"dp":114,"lt":250,"aw":49},{"d":"2024-08-01","sl":415,"ah":54.9,"lh":48,"tp":0.28,"rr":12.25,"hv":85,"rm":88,"dp":112,"lt":216,"aw":67},{"d":"2024-08-02","sl":434,"ah":56.9,"lh":50,"tp":0.26,"rr":12.5,"hv":68,"rm":107,"dp":82,"lt":245,"aw":36},{"d":"2024-08-03","sl":407,"ah":52.2,"lh":46,"tp":-0.04,"rr":13.25,"hv":113,"rm":80,"dp":86,"lt":242,"aw":134},{"d":"2024-08-04","sl":418,"ah":50.6,"lh":44,"tp":-0.66,"rr":12.12,"hv":114,"rm":64,"dp":98,"lt":256,"aw":114},{"d":"2024-08-05","sl":440,"ah":49.7,"lh":43,"tp":-0.22,"rr":12.62,"hv":92,"rm":120,"dp":89,"lt":230,"aw":42},{"d":"2024-08-06","sl":436,"ah":54.5,"lh":49,"tp":0.09,"rr":12.5,"hv":81,"rm":108,"dp":67,"lt":262,"aw":65},{"d":"2024-08-07","sl":419,"ah":57.9,"lh":52,"tp":0.34,"rr":12.25,"hv":76,"rm":84,"dp":94,"lt":240,"aw":122},{"d":"2024-08-08","sl":377,"ah":51.9,"lh":46,"tp":-0.02,"rr":12.25,"hv":92,"rm":106,"dp":98,"lt":173,"aw":98},{"d":"2024-08-09","sl":397,"ah":49.6,"lh":45,"tp":0.1,"rr":12.62,"hv":99,"rm":143,"dp":112,"lt":142,"aw":75},{"d":"2024-08-10","sl":446,"ah":52.4,"lh":45,"tp":0.1,"rr":12.38,"hv":112,"rm":112,"dp":108,"lt":226,"aw":118},{"d":"2024-08-11","sl":466,"ah":52.5,"lh":47,"tp":-0.31,"rr":12.5,"hv":92,"rm":126,"dp":128,"lt":213,"aw":46},{"d":"2024-08-12","sl":454,"ah":55.7,"lh":49,"tp":0.0,"rr":12.25,"hv":91,"rm":132,"dp":95,"lt":228,"aw":46},{"d":"2024-08-13","sl":449,"ah":52.8,"lh":49,"tp":0.2,"rr":12.5,"hv":109,"rm":133,"dp":100,"lt":216,"aw":61},{"d":"2024-08-14","sl":447,"ah":54.4,"lh":48,"tp":0.37,"rr":12.5,"hv":89,"rm":109,"dp":127,"lt":211,"aw":65},{"d":"2024-08-15","sl":390,"ah":53.7,"lh":50,"tp":0.07,"rr":12.62,"hv":88,"rm":104,"dp":83,"lt":204,"aw":125},{"d":"2024-08-16","sl":420,"ah":52.7,"lh":47,"tp":-0.09,"rr":12.38,"hv":80,"rm":100,"dp":102,"lt":216,"aw":78},{"d":"2024-08-18","sl":473,"ah":48.5,"lh":43,"tp":0.07,"rr":12.62,"hv":128,"rm":165,"dp":87,"lt":221,"aw":106},{"d":"2024-08-19","sl":432,"ah":52.0,"lh":46,"tp":0.23,"rr":12.62,"hv":104,"rm":120,"dp":112,"lt":199,"aw":71},{"d":"2024-08-20","sl":410,"ah":58.5,"lh":50,"tp":0.4,"rr":12.62,"hv":63,"rm":110,"dp":109,"lt":191,"aw":67},{"d":"2024-08-21","sl":436,"ah":53.3,"lh":48,"tp":0.41,"rr":12.62,"hv":104,"rm":132,"dp":122,"lt":182,"aw":62},{"d":"2024-08-22","sl":452,"ah":50.3,"lh":46,"tp":0.11,"rr":12.62,"hv":120,"rm":142,"dp":114,"lt":196,"aw":58},{"d":"2024-08-23","sl":406,"ah":53.4,"lh":48,"tp":0.13,"rr":12.62,"hv":117,"rm":91,"dp":88,"lt":228,"aw":108},{"d":"2024-08-24","sl":476,"ah":52.5,"lh":43,"tp":0.17,"rr":12.75,"hv":104,"rm":109,"dp":94,"lt":272,"aw":74},{"d":"2024-08-25","sl":422,"ah":53.4,"lh":46,"tp":0.12,"rr":13.25,"hv":99,"rm":84,"dp":94,"lt":244,"aw":75},{"d":"2024-08-26","sl":446,"ah":50.6,"lh":46,"tp":0.15,"rr":12.75,"hv":108,"rm":148,"dp":91,"lt":208,"aw":47},{"d":"2024-08-27","sl":440,"ah":51.6,"lh":48,"tp":-0.04,"rr":12.38,"hv":113,"rm":118,"dp":98,"lt":223,"aw":76},{"d":"2024-08-28","sl":424,"ah":49.4,"lh":45,"tp":-0.03,"rr":12.62,"hv":110,"rm":141,"dp":102,"lt":180,"aw":72},{"d":"2024-08-29","sl":459,"ah":55.4,"lh":50,"tp":0.11,"rr":12.5,"hv":88,"rm":142,"dp":104,"lt":214,"aw":47},{"d":"2024-08-30","sl":442,"ah":59.3,"lh":50,"tp":0.06,"rr":12.38,"hv":62,"rm":99,"dp":122,"lt":220,"aw":73},{"d":"2024-08-31","sl":368,"ah":56.1,"lh":49,"tp":-0.23,"rr":12.12,"hv":104,"rm":78,"dp":108,"lt":181,"aw":110},{"d":"2024-09-01","sl":440,"ah":53.8,"lh":49,"tp":-0.21,"rr":12.12,"hv":96,"rm":122,"dp":80,"lt":239,"aw":61},{"d":"2024-09-02","sl":442,"ah":53.0,"lh":48,"tp":-0.04,"rr":12.12,"hv":98,"rm":140,"dp":108,"lt":194,"aw":28},{"d":"2024-09-03","sl":440,"ah":57.0,"lh":51,"tp":-0.17,"rr":12.0,"hv":75,"rm":107,"dp":112,"lt":222,"aw":57},{"d":"2024-09-04","sl":439,"ah":52.0,"lh":48,"tp":0.03,"rr":12.38,"hv":104,"rm":106,"dp":87,"lt":246,"aw":67},{"d":"2024-09-05","sl":436,"ah":52.8,"lh":48,"tp":-0.02,"rr":12.38,"hv":105,"rm":118,"dp":102,"lt":216,"aw":68},{"d":"2024-09-06","sl":436,"ah":52.0,"lh":47,"tp":0.09,"rr":12.25,"hv":105,"rm":130,"dp":108,"lt":198,"aw":50},{"d":"2024-09-07","sl":278,"ah":50.7,"lh":44,"tp":0.08,"rr":12.25,"hv":94,"rm":50,"dp":50,"lt":178,"aw":44},{"d":"2024-09-08","sl":432,"ah":51.7,"lh":47,"tp":0.29,"rr":12.5,"hv":108,"rm":98,"dp":94,"lt":240,"aw":110},{"d":"2024-09-09","sl":430,"ah":50.3,"lh":43,"tp":0.12,"rr":12.38,"hv":97,"rm":94,"dp":137,"lt":199,"aw":56},{"d":"2024-09-10","sl":432,"ah":50.2,"lh":46,"tp":-0.16,"rr":12.25,"hv":116,"rm":136,"dp":100,"lt":196,"aw":44},{"d":"2024-09-11","sl":436,"ah":51.3,"lh":46,"tp":0.1,"rr":12.5,"hv":106,"rm":153,"dp":132,"lt":152,"aw":42},{"d":"2024-09-12","sl":440,"ah":51.3,"lh":46,"tp":-0.22,"rr":12.25,"hv":108,"rm":132,"dp":124,"lt":184,"aw":59},{"d":"2024-09-13","sl":396,"ah":56.3,"lh":48,"tp":0.02,"rr":12.75,"hv":79,"rm":92,"dp":124,"lt":180,"aw":75},{"d":"2024-09-14","sl":478,"ah":50.2,"lh":45,"tp":-0.09,"rr":12.12,"hv":130,"rm":110,"dp":98,"lt":270,"aw":58},{"d":"2024-09-15","sl":496,"ah":54.4,"lh":46,"tp":0.16,"rr":12.5,"hv":86,"rm":116,"dp":145,"lt":236,"aw":71},{"d":"2024-09-16","sl":415,"ah":52.4,"lh":47,"tp":0.01,"rr":12.62,"hv":93,"rm":128,"dp":96,"lt":190,"aw":71},{"d":"2024-09-18","sl":468,"ah":51.6,"lh":44,"tp":-0.08,"rr":12.5,"hv":106,"rm":125,"dp":108,"lt":234,"aw":32},{"d":"2024-09-19","sl":436,"ah":61.4,"lh":55,"tp":0.06,"rr":12.12,"hv":51,"rm":110,"dp":103,"lt":224,"aw":68},{"d":"2024-09-20","sl":440,"ah":50.9,"lh":46,"tp":-0.19,"rr":12.75,"hv":116,"rm":129,"dp":110,"lt":202,"aw":73},{"d":"2024-09-21","sl":432,"ah":56.1,"lh":48,"tp":-0.34,"rr":12.25,"hv":82,"rm":124,"dp":100,"lt":208,"aw":43},{"d":"2024-09-22","sl":429,"ah":56.3,"lh":52,"tp":-0.02,"rr":12.25,"hv":75,"rm":96,"dp":76,"lt":258,"aw":34},{"d":"2024-09-23","sl":456,"ah":52.8,"lh":48,"tp":0.03,"rr":12.88,"hv":91,"rm":104,"dp":108,"lt":244,"aw":48},{"d":"2024-09-24","sl":447,"ah":55.7,"lh":50,"tp":0.05,"rr":12.25,"hv":96,"rm":118,"dp":89,"lt":240,"aw":54},{"d":"2024-09-25","sl":431,"ah":53.4,"lh":49,"tp":0.05,"rr":12.25,"hv":104,"rm":137,"dp":98,"lt":196,"aw":44},{"d":"2024-09-26","sl":414,"ah":55.2,"lh":51,"tp":0.05,"rr":12.25,"hv":92,"rm":115,"dp":102,"lt":196,"aw":50},{"d":"2024-09-27","sl":385,"ah":56.9,"lh":51,"tp":0.29,"rr":12.12,"hv":87,"rm":88,"dp":110,"lt":188,"aw":96},{"d":"2024-09-28","sl":468,"ah":54.2,"lh":47,"tp":0.04,"rr":12.5,"hv":87,"rm":121,"dp":106,"lt":242,"aw":68},{"d":"2024-09-29","sl":455,"ah":53.1,"lh":45,"tp":0.06,"rr":12.25,"hv":94,"rm":98,"dp":128,"lt":229,"aw":78},{"d":"2024-09-30","sl":436,"ah":55.7,"lh":51,"tp":0.04,"rr":12.12,"hv":70,"rm":133,"dp":100,"lt":203,"aw":37},{"d":"2024-10-01","sl":433,"ah":58.9,"lh":48,"tp":0.18,"rr":12.38,"hv":64,"rm":55,"dp":83,"lt":295,"aw":50},{"d":"2024-10-02","sl":458,"ah":57.0,"lh":51,"tp":0.08,"rr":12.12,"hv":72,"rm":140,"dp":126,"lt":190,"aw":55},{"d":"2024-10-03","sl":434,"ah":58.2,"lh":51,"tp":0.14,"rr":12.5,"hv":60,"rm":102,"dp":96,"lt":236,"aw":50},{"d":"2024-10-04","sl":424,"ah":52.3,"lh":48,"tp":-0.04,"rr":12.25,"hv":117,"rm":81,"dp":114,"lt":228,"aw":73},{"d":"2024-10-05","sl":454,"ah":55.2,"lh":48,"tp":0.05,"rr":12.25,"hv":76,"rm":130,"dp":120,"lt":202,"aw":90},{"d":"2024-10-06","sl":450,"ah":55.6,"lh":51,"tp":0.22,"rr":12.62,"hv":82,"rm":106,"dp":116,"lt":228,"aw":41},{"d":"2024-10-07","sl":448,"ah":55.9,"lh":51,"tp":0.04,"rr":12.25,"hv":78,"rm":132,"dp":100,"lt":216,"aw":38},{"d":"2024-10-08","sl":448,"ah":51.4,"lh":45,"tp":0.02,"rr":12.0,"hv":110,"rm":134,"dp":102,"lt":212,"aw":32},{"d":"2024-10-09","sl":436,"ah":56.4,"lh":50,"tp":-0.14,"rr":12.5,"hv":85,"rm":101,"dp":86,"lt":250,"aw":40},{"d":"2024-10-10","sl":442,"ah":56.0,"lh":48,"tp":0.06,"rr":12.5,"hv":89,"rm":126,"dp":107,"lt":209,"aw":47},{"d":"2024-10-11","sl":439,"ah":59.0,"lh":54,"tp":0.21,"rr":12.38,"hv":69,"rm":115,"dp":134,"lt":190,"aw":50},{"d":"2024-10-12","sl":436,"ah":55.3,"lh":49,"tp":0.17,"rr":12.25,"hv":94,"rm":106,"dp":94,"lt":236,"aw":78},{"d":"2024-10-13","sl":418,"ah":57.5,"lh":51,"tp":0.17,"rr":12.75,"hv":71,"rm":98,"dp":105,"lt":214,"aw":68},{"d":"2024-10-14","sl":466,"ah":59.4,"lh":52,"tp":0.15,"rr":12.62,"hv":65,"rm":120,"dp":114,"lt":232,"aw":32},{"d":"2024-10-15","sl":444,"ah":62.2,"lh":57,"tp":0.26,"rr":12.62,"hv":45,"rm":118,"dp":116,"lt":208,"aw":32},{"d":"2024-10-16","sl":450,"ah":57.0,"lh":50,"tp":0.09,"rr":12.88,"hv":78,"rm":134,"dp":92,"lt":224,"aw":43},{"d":"2024-10-17","sl":444,"ah":56.9,"lh":51,"tp":0.07,"rr":12.5,"hv":82,"rm":124,"dp":105,"lt":215,"aw":38},{"d":"2024-10-18","sl":434,"ah":57.1,"lh":50,"tp":0.14,"rr":12.38,"hv":77,"rm":119,"dp":100,"lt":215,"aw":49},{"d":"2024-10-19","sl":434,"ah":53.7,"lh":48,"tp":0.08,"rr":12.62,"hv":95,"rm":112,"dp":84,"lt":238,"aw":80},{"d":"2024-10-20","sl":500,"ah":55.6,"lh":45,"tp":0.1,"rr":12.38,"hv":87,"rm":106,"dp":114,"lt":280,"aw":57},{"d":"2024-10-21","sl":456,"ah":61.5,"lh":53,"tp":0.15,"rr":12.25,"hv":56,"rm":82,"dp":91,"lt":284,"aw":48},{"d":"2024-10-22","sl":436,"ah":52.5,"lh":48,"tp":0.03,"rr":12.5,"hv":108,"rm":118,"dp":94,"lt":224,"aw":52},{"d":"2024-10-23","sl":439,"ah":59.3,"lh":49,"tp":-0.13,"rr":15.75,"hv":67,"rm":54,"dp":74,"lt":311,"aw":45},{"d":"2024-10-24","sl":399,"ah":57.6,"lh":51,"tp":0.12,"rr":13.75,"hv":79,"rm":47,"dp":94,"lt":258,"aw":77},{"d":"2024-10-25","sl":410,"ah":57.0,"lh":52,"tp":0.29,"rr":12.62,"hv":78,"rm":108,"dp":84,"lt":218,"aw":77},{"d":"2024-10-26","sl":420,"ah":55.4,"lh":50,"tp":-0.06,"rr":12.38,"hv":91,"rm":90,"dp":111,"lt":220,"aw":97},{"d":"2024-10-27","sl":411,"ah":51.3,"lh":48,"tp":-0.05,"rr":12.5,"hv":84,"rm":96,"dp":84,"lt":231,"aw":61},{"d":"2024-10-28","sl":410,"ah":60.7,"lh":54,"tp":-0.03,"rr":12.12,"hv":53,"rm":100,"dp":93,"lt":216,"aw":42},{"d":"2024-10-29","sl":434,"ah":57.1,"lh":50,"tp":0.1,"rr":12.5,"hv":82,"rm":106,"dp":115,"lt":213,"aw":60},{"d":"2024-10-30","sl":435,"ah":53.8,"lh":48,"tp":0.19,"rr":12.38,"hv":103,"rm":102,"dp":136,"lt":197,"aw":79},{"d":"2024-10-31","sl":450,"ah":60.1,"lh":51,"tp":0.19,"rr":12.38,"hv":58,"rm":106,"dp":96,"lt":247,"aw":68},{"d":"2024-11-01","sl":436,"ah":53.4,"lh":45,"tp":-0.03,"rr":12.62,"hv":100,"rm":64,"dp":88,"lt":284,"aw":102},{"d":"2024-11-02","sl":383,"ah":59.1,"lh":52,"tp":0.27,"rr":12.5,"hv":62,"rm":102,"dp":126,"lt":155,"aw":114},{"d":"2024-11-03","sl":438,"ah":58.4,"lh":53,"tp":0.24,"rr":12.12,"hv":57,"rm":140,"dp":120,"lt":178,"aw":39},{"d":"2024-11-04","sl":366,"ah":63.6,"lh":58,"tp":0.12,"rr":12.38,"hv":49,"rm":78,"dp":86,"lt":203,"aw":75},{"d":"2024-11-05","sl":442,"ah":58.1,"lh":48,"tp":0.23,"rr":12.5,"hv":79,"rm":96,"dp":132,"lt":214,"aw":44},{"d":"2024-11-06","sl":418,"ah":63.7,"lh":50,"tp":0.17,"rr":12.88,"hv":46,"rm":90,"dp":80,"lt":248,"aw":57},{"d":"2024-11-07","sl":451,"ah":56.3,"lh":49,"tp":-0.16,"rr":12.75,"hv":75,"rm":104,"dp":134,"lt":213,"aw":34},{"d":"2024-11-08","sl":392,"ah":59.0,"lh":51,"tp":0.4,"rr":12.62,"hv":75,"rm":70,"dp":92,"lt":231,"aw":52},{"d":"2024-11-09","sl":432,"ah":53.3,"lh":49,"tp":-0.37,"rr":12.12,"hv":104,"rm":122,"dp":92,"lt":218,"aw":106},{"d":"2024-11-10","sl":419,"ah":57.8,"lh":49,"tp":-0.12,"rr":12.38,"hv":66,"rm":96,"dp":70,"lt":254,"aw":60},{"d":"2024-11-11","sl":426,"ah":56.8,"lh":50,"tp":0.14,"rr":12.38,"hv":79,"rm":66,"dp":102,"lt":259,"aw":42},{"d":"2024-11-12","sl":452,"ah":53.0,"lh":48,"tp":0.07,"rr":12.25,"hv":108,"rm":120,"dp":114,"lt":218,"aw":34},{"d":"2024-11-13","sl":416,"ah":59.0,"lh":53,"tp":0.26,"rr":12.12,"hv":62,"rm":104,"dp":104,"lt":208,"aw":46},{"d":"2024-11-14","sl":462,"ah":56.1,"lh":50,"tp":-0.06,"rr":12.38,"hv":86,"rm":131,"dp":122,"lt":208,"aw":32},{"d":"2024-11-15","sl":431,"ah":53.4,"lh":47,"tp":-0.38,"rr":12.38,"hv":96,"rm":120,"dp":104,"lt":206,"aw":32},{"d":"2024-11-16","sl":394,"ah":55.3,"lh":49,"tp":-0.09,"rr":12.12,"hv":88,"rm":109,"dp":97,"lt":188,"aw":95},{"d":"2024-11-17","sl":452,"ah":57.3,"lh":50,"tp":-0.05,"rr":11.88,"hv":72,"rm":102,"dp":102,"lt":248,"aw":51},{"d":"2024-11-18","sl":437,"ah":58.7,"lh":53,"tp":0.3,"rr":12.5,"hv":49,"rm":104,"dp":115,"lt":218,"aw":52},{"d":"2024-11-19","sl":444,"ah":59.7,"lh":54,"tp":0.1,"rr":12.38,"hv":61,"rm":86,"dp":119,"lt":238,"aw":61},{"d":"2024-11-20","sl":402,"ah":55.6,"lh":51,"tp":-0.05,"rr":12.0,"hv":97,"rm":100,"dp":110,"lt":193,"aw":90},{"d":"2024-11-21","sl":388,"ah":61.4,"lh":57,"tp":0.09,"rr":12.12,"hv":50,"rm":120,"dp":93,"lt":175,"aw":80},{"d":"2024-11-22","sl":413,"ah":57.5,"lh":53,"tp":0.24,"rr":12.5,"hv":70,"rm":104,"dp":124,"lt":186,"aw":65},{"d":"2024-11-23","sl":482,"ah":60.9,"lh":56,"tp":0.14,"rr":12.25,"hv":56,"rm":89,"dp":108,"lt":286,"aw":120},{"d":"2024-11-24","sl":476,"ah":58.2,"lh":51,"tp":0.18,"rr":12.25,"hv":75,"rm":119,"dp":118,"lt":238,"aw":36},{"d":"2024-11-25","sl":466,"ah":58.8,"lh":53,"tp":0.07,"rr":12.75,"hv":69,"rm":110,"dp":124,"lt":232,"aw":38},{"d":"2024-11-26","sl":462,"ah":61.1,"lh":52,"tp":-0.07,"rr":12.12,"hv":60,"rm":126,"dp":61,"lt":274,"aw":31},{"d":"2024-11-27","sl":446,"ah":53.5,"lh":48,"tp":-0.21,"rr":12.25,"hv":100,"rm":130,"dp":110,"lt":206,"aw":53},{"d":"2024-11-28","sl":434,"ah":58.4,"lh":47,"tp":-0.04,"rr":12.0,"hv":69,"rm":92,"dp":88,"lt":252,"aw":90},{"d":"2024-11-29","sl":458,"ah":55.0,"lh":48,"tp":-0.12,"rr":12.12,"hv":91,"rm":86,"dp":114,"lt":258,"aw":76},{"d":"2024-11-30","sl":416,"ah":61.9,"lh":54,"tp":0.32,"rr":12.38,"hv":45,"rm":112,"dp":111,"lt":193,"aw":68},{"d":"2024-12-01","sl":480,"ah":56.9,"lh":51,"tp":0.07,"rr":12.0,"hv":76,"rm":127,"dp":104,"lt":250,"aw":63},{"d":"2024-12-02","sl":401,"ah":60.9,"lh":54,"tp":0.2,"rr":12.0,"hv":53,"rm":79,"dp":96,"lt":226,"aw":92},{"d":"2024-12-03","sl":428,"ah":55.5,"lh":48,"tp":0.03,"rr":12.12,"hv":80,"rm":105,"dp":99,"lt":224,"aw":52},{"d":"2024-12-04","sl":444,"ah":62.3,"lh":56,"tp":0.14,"rr":12.0,"hv":48,"rm":94,"dp":90,"lt":259,"aw":54},{"d":"2024-12-05","sl":434,"ah":61.4,"lh":53,"tp":0.29,"rr":12.5,"hv":55,"rm":96,"dp":116,"lt":222,"aw":50},{"d":"2024-12-06","sl":420,"ah":59.4,"lh":55,"tp":0.14,"rr":11.88,"hv":68,"rm":100,"dp":95,"lt":225,"aw":67},{"d":"2024-12-07","sl":438,"ah":58.7,"lh":53,"tp":0.16,"rr":12.0,"hv":72,"rm":105,"dp":110,"lt":224,"aw":89},{"d":"2024-12-08","sl":412,"ah":59.9,"lh":54,"tp":0.05,"rr":12.0,"hv":61,"rm":79,"dp":85,"lt":248,"aw":34},{"d":"2024-12-09","sl":438,"ah":60.9,"lh":54,"tp":0.13,"rr":12.38,"hv":60,"rm":125,"dp":116,"lt":197,"aw":49},{"d":"2024-12-10","sl":426,"ah":58.9,"lh":52,"tp":0.2,"rr":12.25,"hv":72,"rm":133,"dp":88,"lt":206,"aw":57},{"d":"2024-12-11","sl":430,"ah":62.1,"lh":56,"tp":0.12,"rr":12.12,"hv":53,"rm":98,"dp":100,"lt":232,"aw":55},{"d":"2024-12-12","sl":430,"ah":56.6,"lh":51,"tp":0.07,"rr":12.0,"hv":90,"rm":130,"dp":90,"lt":211,"aw":36},{"d":"2024-12-13","sl":416,"ah":60.4,"lh":53,"tp":0.13,"rr":12.5,"hv":63,"rm":106,"dp":105,"lt":206,"aw":62},{"d":"2024-12-14","sl":436,"ah":61.4,"lh":52,"tp":0.11,"rr":12.0,"hv":69,"rm":77,"dp":96,"lt":264,"aw":117},{"d":"2024-12-15","sl":436,"ah":53.0,"lh":48,"tp":-0.1,"rr":12.0,"hv":107,"rm":98,"dp":104,"lt":234,"aw":97},{"d":"2024-12-16","sl":438,"ah":57.3,"lh":52,"tp":-0.02,"rr":12.0,"hv":75,"rm":76,"dp":110,"lt":254,"aw":74},{"d":"2024-12-17","sl":435,"ah":64.3,"lh":54,"tp":0.19,"rr":12.75,"hv":39,"rm":106,"dp":96,"lt":232,"aw":58},{"d":"2024-12-18","sl":415,"ah":60.8,"lh":50,"tp":0.15,"rr":12.25,"hv":61,"rm":88,"dp":107,"lt":220,"aw":81},{"d":"2024-12-19","sl":372,"ah":61.3,"lh":56,"tp":0.16,"rr":12.12,"hv":55,"rm":78,"dp":130,"lt":164,"aw":128},{"d":"2024-12-20","sl":450,"ah":57.4,"lh":50,"tp":-0.14,"rr":12.12,"hv":76,"rm":110,"dp":124,"lt":215,"aw":61},{"d":"2024-12-21","sl":397,"ah":57.4,"lh":50,"tp":-0.05,"rr":12.25,"hv":79,"rm":92,"dp":96,"lt":210,"aw":124},{"d":"2024-12-22","sl":440,"ah":54.8,"lh":50,"tp":0.04,"rr":12.38,"hv":97,"rm":128,"dp":100,"lt":212,"aw":86},{"d":"2024-12-23","sl":447,"ah":58.8,"lh":54,"tp":0.16,"rr":12.5,"hv":70,"rm":118,"dp":90,"lt":238,"aw":45},{"d":"2024-12-24","sl":436,"ah":54.0,"lh":49,"tp":-0.06,"rr":12.5,"hv":102,"rm":128,"dp":106,"lt":202,"aw":73},{"d":"2024-12-25","sl":412,"ah":55.7,"lh":50,"tp":-0.31,"rr":11.88,"hv":82,"rm":112,"dp":100,"lt":200,"aw":86},{"d":"2024-12-26","sl":444,"ah":54.9,"lh":48,"tp":-0.11,"rr":11.75,"hv":93,"rm":104,"dp":80,"lt":260,"aw":88},{"d":"2024-12-27","sl":456,"ah":55.4,"lh":49,"tp":-0.06,"rr":11.62,"hv":80,"rm":130,"dp":105,"lt":222,"aw":83},{"d":"2024-12-28","sl":470,"ah":58.6,"lh":51,"tp":-0.06,"rr":12.12,"hv":65,"rm":74,"dp":112,"lt":285,"aw":56},{"d":"2024-12-29","sl":394,"ah":58.0,"lh":53,"tp":0.06,"rr":12.12,"hv":73,"rm":92,"dp":76,"lt":225,"aw":123},{"d":"2024-12-30","sl":464,"ah":57.7,"lh":51,"tp":0.02,"rr":11.75,"hv":71,"rm":129,"dp":92,"lt":244,"aw":43},{"d":"2024-12-31","sl":430,"ah":56.4,"lh":51,"tp":0.18,"rr":12.25,"hv":79,"rm":116,"dp":77,"lt":238,"aw":113},{"d":"2025-01-01","sl":368,"ah":61.0,"lh":54,"tp":0.11,"rr":12.12,"hv":65,"rm":90,"dp":90,"lt":188,"aw":110},{"d":"2025-01-02","sl":380,"ah":55.8,"lh":50,"tp":0.13,"rr":12.12,"hv":102,"rm":84,"dp":106,"lt":189,"aw":104},{"d":"2025-01-03","sl":445,"ah":57.4,"lh":52,"tp":0.22,"rr":12.62,"hv":79,"rm":86,"dp":114,"lt":245,"aw":60},{"d":"2025-01-04","sl":467,"ah":56.7,"lh":48,"tp":-0.17,"rr":12.0,"hv":92,"rm":121,"dp":80,"lt":266,"aw":101},{"d":"2025-01-05","sl":432,"ah":58.9,"lh":54,"tp":-0.13,"rr":12.38,"hv":75,"rm":106,"dp":95,"lt":232,"aw":157},{"d":"2025-01-06","sl":424,"ah":65.3,"lh":58,"tp":0.2,"rr":12.12,"hv":33,"rm":78,"dp":111,"lt":234,"aw":89},{"d":"2025-01-07","sl":396,"ah":68.5,"lh":55,"tp":0.42,"rr":12.75,"hv":43,"rm":96,"dp":50,"lt":249,"aw":145},{"d":"2025-01-08","sl":424,"ah":62.4,"lh":57,"tp":0.18,"rr":12.88,"hv":61,"rm":80,"dp":86,"lt":258,"aw":57},{"d":"2025-01-09","sl":472,"ah":62.2,"lh":55,"tp":0.14,"rr":12.38,"hv":59,"rm":95,"dp":110,"lt":267,"aw":102},{"d":"2025-01-10","sl":396,"ah":62.9,"lh":56,"tp":0.08,"rr":13.0,"hv":48,"rm":88,"dp":98,"lt":210,"aw":108},{"d":"2025-01-11","sl":468,"ah":57.0,"lh":52,"tp":-0.23,"rr":12.12,"hv":82,"rm":116,"dp":126,"lt":228,"aw":85},{"d":"2025-01-12","sl":474,"ah":55.5,"lh":50,"tp":-0.15,"rr":12.25,"hv":97,"rm":128,"dp":104,"lt":242,"aw":72},{"d":"2025-01-13","sl":477,"ah":55.0,"lh":50,"tp":-0.04,"rr":12.25,"hv":102,"rm":140,"dp":96,"lt":242,"aw":59},{"d":"2025-01-14","sl":473,"ah":57.6,"lh":51,"tp":0.08,"rr":12.38,"hv":77,"rm":130,"dp":89,"lt":254,"aw":64},{"d":"2025-01-15","sl":467,"ah":57.4,"lh":52,"tp":-0.13,"rr":12.25,"hv":85,"rm":114,"dp":90,"lt":262,"aw":53},{"d":"2025-01-16","sl":480,"ah":56.2,"lh":49,"tp":-0.07,"rr":12.0,"hv":95,"rm":106,"dp":88,"lt":285,"aw":76},{"d":"2025-01-17","sl":454,"ah":55.8,"lh":50,"tp":0.06,"rr":12.5,"hv":82,"rm":95,"dp":98,"lt":261,"aw":73},{"d":"2025-01-18","sl":450,"ah":60.0,"lh":53,"tp":0.16,"rr":12.5,"hv":61,"rm":106,"dp":98,"lt":247,"aw":52},{"d":"2025-01-19","sl":454,"ah":60.3,"lh":52,"tp":0.23,"rr":12.75,"hv":61,"rm":133,"dp":104,"lt":217,"aw":47},{"d":"2025-01-20","sl":430,"ah":58.8,"lh":51,"tp":-0.02,"rr":12.38,"hv":79,"rm":110,"dp":69,"lt":250,"aw":112},{"d":"2025-01-21","sl":480,"ah":55.6,"lh":47,"tp":-0.14,"rr":12.12,"hv":100,"rm":94,"dp":106,"lt":281,"aw":78},{"d":"2025-01-22","sl":482,"ah":58.5,"lh":54,"tp":-0.05,"rr":12.38,"hv":75,"rm":104,"dp":116,"lt":262,"aw":67},{"d":"2025-01-23","sl":427,"ah":58.1,"lh":51,"tp":-0.23,"rr":12.25,"hv":75,"rm":96,"dp":94,"lt":236,"aw":55},{"d":"2025-01-24","sl":482,"ah":59.3,"lh":53,"tp":0.15,"rr":12.5,"hv":74,"rm":102,"dp":128,"lt":252,"aw":97},{"d":"2025-01-25","sl":399,"ah":61.8,"lh":54,"tp":0.17,"rr":12.5,"hv":75,"rm":74,"dp":82,"lt":242,"aw":139},{"d":"2025-01-26","sl":402,"ah":63.1,"lh":58,"tp":0.28,"rr":12.5,"hv":53,"rm":95,"dp":114,"lt":194,"aw":60},{"d":"2025-01-27","sl":463,"ah":64.1,"lh":57,"tp":0.27,"rr":12.88,"hv":46,"rm":112,"dp":114,"lt":237,"aw":45},{"d":"2025-01-28","sl":436,"ah":61.7,"lh":56,"tp":-0.02,"rr":12.75,"hv":56,"rm":102,"dp":120,"lt":214,"aw":53},{"d":"2025-01-29","sl":446,"ah":60.2,"lh":51,"tp":-0.14,"rr":12.62,"hv":72,"rm":126,"dp":109,"lt":210,"aw":50},{"d":"2025-01-31","sl":427,"ah":63.7,"lh":56,"tp":0.07,"rr":12.75,"hv":46,"rm":127,"dp":108,"lt":192,"aw":17},{"d":"2025-02-01","sl":441,"ah":56.7,"lh":49,"tp":-0.03,"rr":12.38,"hv":88,"rm":125,"dp":97,"lt":219,"aw":80},{"d":"2025-02-02","sl":372,"ah":69.6,"lh":63,"tp":0.0,"rr":12.5,"hv":24,"rm":78,"dp":84,"lt":210,"aw":101},{"d":"2025-02-03","sl":440,"ah":59.3,"lh":54,"tp":0.08,"rr":12.5,"hv":71,"rm":112,"dp":122,"lt":206,"aw":30},{"d":"2025-02-04","sl":414,"ah":62.1,"lh":53,"tp":0.01,"rr":12.25,"hv":61,"rm":92,"dp":90,"lt":232,"aw":68},{"d":"2025-02-05","sl":446,"ah":62.2,"lh":55,"tp":0.54,"rr":12.62,"hv":64,"rm":80,"dp":91,"lt":276,"aw":71},{"d":"2025-02-06","sl":397,"ah":70.3,"lh":65,"tp":1.1,"rr":12.75,"hv":35,"rm":65,"dp":82,"lt":250,"aw":90},{"d":"2025-02-07","sl":406,"ah":73.5,"lh":61,"tp":1.56,"rr":13.12,"hv":37,"rm":49,"dp":62,"lt":296,"aw":130},{"d":"2025-02-08","sl":394,"ah":81.1,"lh":72,"tp":2.19,"rr":14.5,"hv":15,"rm":64,"dp":76,"lt":254,"aw":131},{"d":"2025-02-09","sl":424,"ah":72.3,"lh":63,"tp":1.4,"rr":14.5,"hv":34,"rm":69,"dp":98,"lt":256,"aw":154},{"d":"2025-02-10","sl":408,"ah":70.2,"lh":62,"tp":0.86,"rr":13.5,"hv":32,"rm":74,"dp":92,"lt":243,"aw":66},{"d":"2025-02-11","sl":412,"ah":60.9,"lh":56,"tp":0.13,"rr":12.62,"hv":69,"rm":89,"dp":122,"lt":202,"aw":63},{"d":"2025-02-12","sl":464,"ah":59.5,"lh":54,"tp":-0.04,"rr":12.62,"hv":66,"rm":111,"dp":136,"lt":216,"aw":74},{"d":"2025-02-13","sl":452,"ah":58.0,"lh":50,"tp":-0.02,"rr":12.38,"hv":81,"rm":107,"dp":81,"lt":264,"aw":54},{"d":"2025-02-14","sl":467,"ah":59.8,"lh":51,"tp":-0.07,"rr":12.62,"hv":66,"rm":114,"dp":122,"lt":231,"aw":52},{"d":"2025-02-15","sl":447,"ah":62.2,"lh":54,"tp":0.21,"rr":12.62,"hv":46,"rm":158,"dp":101,"lt":188,"aw":57},{"d":"2025-02-16","sl":454,"ah":64.6,"lh":55,"tp":0.04,"rr":12.38,"hv":49,"rm":93,"dp":64,"lt":297,"aw":62},{"d":"2025-02-17","sl":454,"ah":62.1,"lh":57,"tp":0.01,"rr":12.25,"hv":48,"rm":83,"dp":90,"lt":280,"aw":79},{"d":"2025-02-18","sl":464,"ah":60.0,"lh":53,"tp":0.03,"rr":12.62,"hv":60,"rm":110,"dp":92,"lt":262,"aw":46},{"d":"2025-02-19","sl":427,"ah":62.4,"lh":56,"tp":0.04,"rr":12.38,"hv":56,"rm":108,"dp":108,"lt":211,"aw":47},{"d":"2025-02-20","sl":433,"ah":61.5,"lh":56,"tp":0.02,"rr":12.38,"hv":56,"rm":123,"dp":80,"lt":230,"aw":76},{"d":"2025-02-21","sl":440,"ah":60.6,"lh":52,"tp":0.12,"rr":12.5,"hv":66,"rm":106,"dp":89,"lt":244,"aw":80},{"d":"2025-02-22","sl":394,"ah":61.1,"lh":57,"tp":0.03,"rr":12.5,"hv":67,"rm":118,"dp":104,"lt":174,"aw":100},{"d":"2025-02-23","sl":360,"ah":70.4,"lh":67,"tp":0.3,"rr":12.25,"hv":28,"rm":74,"dp":69,"lt":217,"aw":73},{"d":"2025-02-24","sl":450,"ah":60.3,"lh":55,"tp":-0.01,"rr":12.38,"hv":71,"rm":116,"dp":110,"lt":223,"aw":58},{"d":"2025-02-25","sl":428,"ah":63.1,"lh":59,"tp":-0.05,"rr":12.25,"hv":53,"rm":124,"dp":84,"lt":220,"aw":69},{"d":"2025-02-26","sl":464,"ah":62.2,"lh":55,"tp":0.16,"rr":12.75,"hv":67,"rm":98,"dp":105,"lt":260,"aw":52},{"d":"2025-02-27","sl":421,"ah":58.9,"lh":52,"tp":-0.01,"rr":12.5,"hv":85,"rm":100,"dp":107,"lt":214,"aw":99},{"d":"2025-02-28","sl":440,"ah":58.9,"lh":52,"tp":-0.08,"rr":12.25,"hv":69,"rm":108,"dp":107,"lt":224,"aw":68},{"d":"2025-03-01","sl":424,"ah":64.7,"lh":57,"tp":-0.05,"rr":12.5,"hv":46,"rm":94,"dp":121,"lt":208,"aw":118},{"d":"2025-03-02","sl":275,"ah":67.0,"lh":62,"tp":-0.24,"rr":12.5,"hv":39,"rm":44,"dp":74,"lt":156,"aw":140},{"d":"2025-03-03","sl":473,"ah":57.5,"lh":48,"tp":-0.02,"rr":12.5,"hv":92,"rm":120,"dp":106,"lt":248,"aw":48},{"d":"2025-03-04","sl":454,"ah":57.5,"lh":51,"tp":-0.11,"rr":12.38,"hv":79,"rm":142,"dp":117,"lt":195,"aw":32},{"d":"2025-03-05","sl":385,"ah":59.4,"lh":51,"tp":-0.05,"rr":12.38,"hv":82,"rm":96,"dp":80,"lt":210,"aw":108},{"d":"2025-03-06","sl":444,"ah":59.1,"lh":53,"tp":-0.03,"rr":12.88,"hv":65,"rm":142,"dp":98,"lt":204,"aw":50},{"d":"2025-03-07","sl":440,"ah":59.0,"lh":54,"tp":0.04,"rr":12.75,"hv":68,"rm":126,"dp":96,"lt":219,"aw":64},{"d":"2025-03-08","sl":464,"ah":58.6,"lh":51,"tp":0.04,"rr":12.75,"hv":69,"rm":148,"dp":144,"lt":172,"aw":104},{"d":"2025-03-10","sl":471,"ah":58.0,"lh":50,"tp":0.27,"rr":12.75,"hv":97,"rm":116,"dp":131,"lt":224,"aw":43},{"d":"2025-03-11","sl":455,"ah":61.2,"lh":52,"tp":-0.09,"rr":12.62,"hv":62,"rm":93,"dp":100,"lt":262,"aw":67},{"d":"2025-03-12","sl":434,"ah":55.8,"lh":49,"tp":-0.16,"rr":12.62,"hv":90,"rm":100,"dp":106,"lt":228,"aw":92},{"d":"2025-03-13","sl":438,"ah":59.2,"lh":54,"tp":0.08,"rr":12.75,"hv":68,"rm":112,"dp":112,"lt":214,"aw":59},{"d":"2025-03-14","sl":474,"ah":59.3,"lh":52,"tp":0.0,"rr":13.0,"hv":81,"rm":98,"dp":133,"lt":243,"aw":61},{"d":"2025-03-15","sl":453,"ah":61.8,"lh":54,"tp":0.09,"rr":12.62,"hv":62,"rm":134,"dp":105,"lt":214,"aw":90},{"d":"2025-03-17","sl":446,"ah":56.3,"lh":50,"tp":-0.11,"rr":12.5,"hv":88,"rm":128,"dp":112,"lt":206,"aw":31},{"d":"2025-03-18","sl":456,"ah":58.1,"lh":48,"tp":-0.03,"rr":12.62,"hv":90,"rm":154,"dp":100,"lt":202,"aw":40},{"d":"2025-03-19","sl":460,"ah":59.8,"lh":53,"tp":0.08,"rr":12.62,"hv":62,"rm":138,"dp":116,"lt":206,"aw":34},{"d":"2025-03-20","sl":448,"ah":58.1,"lh":48,"tp":0.09,"rr":12.75,"hv":74,"rm":151,"dp":96,"lt":200,"aw":50},{"d":"2025-03-21","sl":438,"ah":57.9,"lh":51,"tp":0.13,"rr":12.88,"hv":84,"rm":122,"dp":104,"lt":212,"aw":65},{"d":"2025-03-22","sl":482,"ah":51.5,"lh":45,"tp":-0.25,"rr":12.25,"hv":128,"rm":118,"dp":134,"lt":232,"aw":83},{"d":"2025-03-23","sl":502,"ah":56.5,"lh":48,"tp":-0.08,"rr":12.25,"hv":89,"rm":104,"dp":107,"lt":291,"aw":97},{"d":"2025-03-24","sl":452,"ah":53.9,"lh":46,"tp":-0.11,"rr":12.25,"hv":85,"rm":76,"dp":106,"lt":270,"aw":36},{"d":"2025-03-25","sl":434,"ah":57.0,"lh":50,"tp":-0.04,"rr":12.38,"hv":78,"rm":107,"dp":116,"lt":211,"aw":52},{"d":"2025-03-26","sl":446,"ah":51.1,"lh":44,"tp":-0.18,"rr":12.75,"hv":102,"rm":109,"dp":106,"lt":230,"aw":50},{"d":"2025-03-27","sl":440,"ah":55.5,"lh":46,"tp":-0.14,"rr":12.38,"hv":108,"rm":114,"dp":104,"lt":221,"aw":46},{"d":"2025-03-28","sl":431,"ah":55.9,"lh":48,"tp":-0.04,"rr":12.25,"hv":98,"rm":87,"dp":121,"lt":223,"aw":63},{"d":"2025-03-29","sl":397,"ah":62.5,"lh":54,"tp":0.31,"rr":12.5,"hv":50,"rm":62,"dp":64,"lt":272,"aw":100},{"d":"2025-03-30","sl":444,"ah":56.8,"lh":50,"tp":-0.12,"rr":12.38,"hv":84,"rm":128,"dp":83,"lt":234,"aw":80},{"d":"2025-03-31","sl":442,"ah":59.0,"lh":53,"tp":0.01,"rr":12.75,"hv":69,"rm":130,"dp":101,"lt":210,"aw":56},{"d":"2025-04-02","sl":423,"ah":59.5,"lh":54,"tp":-0.05,"rr":12.38,"hv":64,"rm":96,"dp":96,"lt":232,"aw":40},{"d":"2025-04-03","sl":440,"ah":58.2,"lh":48,"tp":-0.09,"rr":12.62,"hv":74,"rm":122,"dp":124,"lt":194,"aw":61},{"d":"2025-04-04","sl":408,"ah":55.6,"lh":49,"tp":-0.03,"rr":12.75,"hv":89,"rm":98,"dp":98,"lt":212,"aw":86},{"d":"2025-04-05","sl":457,"ah":59.1,"lh":53,"tp":-0.03,"rr":12.25,"hv":70,"rm":124,"dp":131,"lt":202,"aw":95},{"d":"2025-04-06","sl":428,"ah":59.4,"lh":53,"tp":-0.04,"rr":12.38,"hv":63,"rm":108,"dp":100,"lt":221,"aw":105},{"d":"2025-04-08","sl":462,"ah":55.6,"lh":51,"tp":0.0,"rr":12.62,"hv":94,"rm":141,"dp":106,"lt":216,"aw":50},{"d":"2025-04-09","sl":444,"ah":61.6,"lh":55,"tp":0.0,"rr":12.88,"hv":54,"rm":106,"dp":107,"lt":231,"aw":53},{"d":"2025-04-11","sl":442,"ah":53.2,"lh":48,"tp":-0.07,"rr":12.5,"hv":97,"rm":134,"dp":120,"lt":188,"aw":68},{"d":"2025-04-12","sl":512,"ah":62.2,"lh":50,"tp":0.05,"rr":12.5,"hv":66,"rm":92,"dp":120,"lt":300,"aw":86},{"d":"2025-04-14","sl":448,"ah":59.7,"lh":48,"tp":0.25,"rr":12.5,"hv":80,"rm":124,"dp":104,"lt":219,"aw":51},{"d":"2025-04-15","sl":415,"ah":53.7,"lh":49,"tp":-0.17,"rr":12.5,"hv":89,"rm":122,"dp":98,"lt":194,"aw":93},{"d":"2025-04-16","sl":448,"ah":59.6,"lh":53,"tp":0.3,"rr":12.75,"hv":66,"rm":108,"dp":118,"lt":222,"aw":78},{"d":"2025-04-17","sl":446,"ah":62.1,"lh":57,"tp":0.08,"rr":12.88,"hv":55,"rm":98,"dp":146,"lt":202,"aw":67},{"d":"2025-04-18","sl":456,"ah":59.7,"lh":54,"tp":0.15,"rr":12.88,"hv":74,"rm":124,"dp":115,"lt":216,"aw":41},{"d":"2025-04-19","sl":492,"ah":55.4,"lh":48,"tp":-0.32,"rr":12.0,"hv":86,"rm":116,"dp":88,"lt":288,"aw":104},{"d":"2025-04-20","sl":469,"ah":58.1,"lh":51,"tp":-0.22,"rr":12.25,"hv":57,"rm":116,"dp":101,"lt":252,"aw":97},{"d":"2025-04-21","sl":462,"ah":60.4,"lh":53,"tp":-0.27,"rr":12.12,"hv":59,"rm":98,"dp":118,"lt":246,"aw":40},{"d":"2025-04-22","sl":420,"ah":65.1,"lh":59,"tp":-0.24,"rr":12.38,"hv":39,"rm":143,"dp":88,"lt":188,"aw":70},{"d":"2025-04-23","sl":458,"ah":63.0,"lh":56,"tp":-0.12,"rr":12.25,"hv":51,"rm":84,"dp":116,"lt":258,"aw":46},{"d":"2025-04-24","sl":438,"ah":60.0,"lh":52,"tp":-0.01,"rr":12.5,"hv":73,"rm":100,"dp":86,"lt":252,"aw":51},{"d":"2025-04-25","sl":410,"ah":58.2,"lh":50,"tp":-0.08,"rr":12.25,"hv":79,"rm":73,"dp":124,"lt":212,"aw":87},{"d":"2025-04-26","sl":454,"ah":55.5,"lh":49,"tp":-0.14,"rr":12.38,"hv":97,"rm":78,"dp":114,"lt":261,"aw":134},{"d":"2025-04-28","sl":355,"ah":55.5,"lh":48,"tp":0.32,"rr":12.12,"hv":122,"rm":69,"dp":67,"lt":219,"aw":59},{"d":"2025-04-29","sl":478,"ah":53.2,"lh":49,"tp":-0.06,"rr":12.75,"hv":96,"rm":125,"dp":114,"lt":238,"aw":24},{"d":"2025-04-30","sl":413,"ah":65.4,"lh":55,"tp":0.08,"rr":12.88,"hv":54,"rm":84,"dp":112,"lt":218,"aw":69},{"d":"2025-05-01","sl":440,"ah":63.1,"lh":51,"tp":0.08,"rr":12.62,"hv":53,"rm":100,"dp":104,"lt":236,"aw":46},{"d":"2025-05-02","sl":420,"ah":57.7,"lh":49,"tp":0.06,"rr":12.25,"hv":75,"rm":94,"dp":94,"lt":232,"aw":49},{"d":"2025-05-03","sl":455,"ah":54.8,"lh":49,"tp":0.09,"rr":12.25,"hv":84,"rm":122,"dp":122,"lt":211,"aw":83},{"d":"2025-05-04","sl":434,"ah":55.4,"lh":50,"tp":-0.13,"rr":12.25,"hv":75,"rm":117,"dp":119,"lt":198,"aw":54},{"d":"2025-05-05","sl":430,"ah":61.7,"lh":57,"tp":0.17,"rr":12.62,"hv":55,"rm":126,"dp":106,"lt":198,"aw":44},{"d":"2025-05-06","sl":433,"ah":55.8,"lh":50,"tp":-0.13,"rr":12.0,"hv":98,"rm":107,"dp":95,"lt":231,"aw":35},{"d":"2025-05-07","sl":416,"ah":61.4,"lh":57,"tp":-0.05,"rr":12.38,"hv":47,"rm":70,"dp":86,"lt":260,"aw":76},{"d":"2025-05-08","sl":412,"ah":64.1,"lh":57,"tp":0.2,"rr":12.75,"hv":59,"rm":84,"dp":92,"lt":236,"aw":90},{"d":"2025-05-09","sl":334,"ah":66.9,"lh":62,"tp":0.12,"rr":12.25,"hv":52,"rm":38,"dp":81,"lt":214,"aw":102},{"d":"2025-05-10","sl":466,"ah":64.0,"lh":54,"tp":0.0,"rr":13.0,"hv":54,"rm":106,"dp":101,"lt":258,"aw":52},{"d":"2025-05-11","sl":458,"ah":57.8,"lh":51,"tp":-0.38,"rr":11.88,"hv":76,"rm":88,"dp":93,"lt":277,"aw":67},{"d":"2025-05-12","sl":430,"ah":54.8,"lh":51,"tp":-0.28,"rr":12.25,"hv":87,"rm":120,"dp":102,"lt":208,"aw":53},{"d":"2025-05-13","sl":442,"ah":59.2,"lh":54,"tp":-0.22,"rr":12.5,"hv":62,"rm":110,"dp":96,"lt":236,"aw":38},{"d":"2025-05-14","sl":420,"ah":60.8,"lh":57,"tp":-0.1,"rr":12.5,"hv":55,"rm":142,"dp":74,"lt":204,"aw":63},{"d":"2025-05-15","sl":454,"ah":57.0,"lh":47,"tp":-0.03,"rr":12.62,"hv":90,"rm":95,"dp":98,"lt":261,"aw":51},{"d":"2025-05-16","sl":448,"ah":52.5,"lh":46,"tp":-0.15,"rr":12.5,"hv":108,"rm":116,"dp":121,"lt":210,"aw":42},{"d":"2025-05-17","sl":482,"ah":52.4,"lh":46,"tp":-0.05,"rr":12.5,"hv":107,"rm":120,"dp":90,"lt":273,"aw":91},{"d":"2025-05-18","sl":459,"ah":56.7,"lh":47,"tp":0.03,"rr":12.38,"hv":96,"rm":112,"dp":86,"lt":262,"aw":76},{"d":"2025-05-19","sl":452,"ah":58.6,"lh":53,"tp":-0.22,"rr":12.12,"hv":67,"rm":94,"dp":88,"lt":270,"aw":53},{"d":"2025-05-20","sl":408,"ah":59.8,"lh":49,"tp":0.05,"rr":12.12,"hv":72,"rm":76,"dp":99,"lt":232,"aw":88},{"d":"2025-05-21","sl":449,"ah":54.4,"lh":45,"tp":-0.23,"rr":12.38,"hv":102,"rm":118,"dp":100,"lt":230,"aw":64},{"d":"2025-05-22","sl":430,"ah":60.0,"lh":50,"tp":-0.1,"rr":12.38,"hv":74,"rm":104,"dp":84,"lt":242,"aw":53},{"d":"2025-05-23","sl":362,"ah":59.8,"lh":51,"tp":0.36,"rr":12.5,"hv":81,"rm":76,"dp":82,"lt":205,"aw":58},{"d":"2025-05-26","sl":468,"ah":55.2,"lh":49,"tp":-0.05,"rr":12.62,"hv":77,"rm":95,"dp":89,"lt":284,"aw":33},{"d":"2025-05-27","sl":423,"ah":52.4,"lh":45,"tp":-0.06,"rr":12.5,"hv":81,"rm":92,"dp":66,"lt":265,"aw":66},{"d":"2025-05-28","sl":407,"ah":58.3,"lh":51,"tp":-0.06,"rr":12.25,"hv":70,"rm":107,"dp":78,"lt":222,"aw":84},{"d":"2025-05-29","sl":418,"ah":63.6,"lh":55,"tp":0.62,"rr":13.0,"hv":54,"rm":92,"dp":108,"lt":218,"aw":85},{"d":"2025-05-30","sl":454,"ah":58.6,"lh":52,"tp":0.07,"rr":12.62,"hv":75,"rm":125,"dp":122,"lt":206,"aw":69},{"d":"2025-05-31","sl":443,"ah":61.2,"lh":55,"tp":0.2,"rr":12.62,"hv":63,"rm":120,"dp":104,"lt":219,"aw":41},{"d":"2025-06-01","sl":366,"ah":64.3,"lh":55,"tp":0.45,"rr":12.5,"hv":67,"rm":85,"dp":86,"lt":196,"aw":100},{"d":"2025-06-02","sl":357,"ah":66.5,"lh":57,"tp":0.91,"rr":13.0,"hv":54,"rm":64,"dp":70,"lt":222,"aw":140},{"d":"2025-06-03","sl":356,"ah":73.4,"lh":62,"tp":1.36,"rr":13.88,"hv":33,"rm":48,"dp":72,"lt":238,"aw":143},{"d":"2025-06-05","sl":448,"ah":65.9,"lh":55,"tp":0.84,"rr":14.12,"hv":41,"rm":62,"dp":90,"lt":296,"aw":65},{"d":"2025-06-06","sl":396,"ah":72.2,"lh":66,"tp":0.58,"rr":14.38,"hv":27,"rm":72,"dp":88,"lt":236,"aw":82},{"d":"2025-06-07","sl":516,"ah":60.1,"lh":49,"tp":0.21,"rr":12.88,"hv":86,"rm":125,"dp":135,"lt":256,"aw":157},{"d":"2025-06-08","sl":420,"ah":61.6,"lh":56,"tp":0.2,"rr":13.25,"hv":70,"rm":120,"dp":74,"lt":226,"aw":110},{"d":"2025-06-09","sl":449,"ah":62.0,"lh":53,"tp":0.13,"rr":13.12,"hv":66,"rm":94,"dp":89,"lt":266,"aw":51},{"d":"2025-06-10","sl":448,"ah":58.1,"lh":49,"tp":-0.09,"rr":12.75,"hv":75,"rm":120,"dp":75,"lt":252,"aw":65},{"d":"2025-06-11","sl":454,"ah":57.6,"lh":51,"tp":-0.05,"rr":12.5,"hv":90,"rm":112,"dp":104,"lt":240,"aw":50},{"d":"2025-06-12","sl":444,"ah":58.8,"lh":49,"tp":-0.15,"rr":12.62,"hv":78,"rm":79,"dp":98,"lt":267,"aw":60},{"d":"2025-06-13","sl":370,"ah":59.4,"lh":49,"tp":-0.02,"rr":12.88,"hv":66,"rm":98,"dp":100,"lt":173,"aw":111},{"d":"2025-06-14","sl":416,"ah":59.8,"lh":49,"tp":-0.21,"rr":12.5,"hv":70,"rm":86,"dp":98,"lt":232,"aw":54},{"d":"2025-06-15","sl":513,"ah":61.0,"lh":52,"tp":0.06,"rr":12.38,"hv":65,"rm":131,"dp":115,"lt":267,"aw":40},{"d":"2025-06-16","sl":440,"ah":56.1,"lh":52,"tp":-0.51,"rr":12.25,"hv":82,"rm":114,"dp":86,"lt":241,"aw":46},{"d":"2025-06-17","sl":439,"ah":63.2,"lh":57,"tp":0.12,"rr":12.25,"hv":51,"rm":90,"dp":108,"lt":240,"aw":48},{"d":"2025-06-18","sl":391,"ah":65.8,"lh":54,"tp":0.0,"rr":13.0,"hv":34,"rm":102,"dp":95,"lt":194,"aw":87},{"d":"2025-06-19","sl":448,"ah":57.4,"lh":49,"tp":-0.09,"rr":12.5,"hv":85,"rm":62,"dp":121,"lt":264,"aw":110},{"d":"2025-06-20","sl":452,"ah":59.2,"lh":50,"tp":0.01,"rr":12.25,"hv":65,"rm":94,"dp":106,"lt":252,"aw":83},{"d":"2025-06-21","sl":516,"ah":59.4,"lh":49,"tp":-0.15,"rr":12.5,"hv":70,"rm":110,"dp":110,"lt":296,"aw":57},{"d":"2025-06-22","sl":440,"ah":59.9,"lh":46,"tp":0.01,"rr":12.38,"hv":78,"rm":114,"dp":92,"lt":232,"aw":44},{"d":"2025-06-23","sl":448,"ah":55.0,"lh":49,"tp":-0.06,"rr":12.12,"hv":106,"rm":97,"dp":102,"lt":248,"aw":49},{"d":"2025-06-24","sl":434,"ah":56.6,"lh":50,"tp":-0.09,"rr":12.25,"hv":93,"rm":106,"dp":80,"lt":247,"aw":55},{"d":"2025-06-25","sl":450,"ah":59.0,"lh":52,"tp":0.0,"rr":12.25,"hv":81,"rm":117,"dp":91,"lt":242,"aw":48},{"d":"2025-06-26","sl":420,"ah":53.6,"lh":48,"tp":0.0,"rr":12.25,"hv":101,"rm":84,"dp":104,"lt":232,"aw":56},{"d":"2025-06-27","sl":416,"ah":57.4,"lh":52,"tp":-0.26,"rr":12.25,"hv":83,"rm":120,"dp":90,"lt":204,"aw":55},{"d":"2025-06-28","sl":414,"ah":60.8,"lh":56,"tp":-0.39,"rr":12.5,"hv":55,"rm":106,"dp":93,"lt":216,"aw":73},{"d":"2025-06-29","sl":418,"ah":54.2,"lh":48,"tp":-0.67,"rr":12.38,"hv":104,"rm":108,"dp":84,"lt":226,"aw":102},{"d":"2025-06-30","sl":441,"ah":54.4,"lh":49,"tp":-0.25,"rr":12.12,"hv":88,"rm":106,"dp":130,"lt":204,"aw":46},{"d":"2025-07-01","sl":397,"ah":56.7,"lh":52,"tp":-0.17,"rr":12.5,"hv":83,"rm":110,"dp":92,"lt":195,"aw":77},{"d":"2025-07-02","sl":452,"ah":55.9,"lh":51,"tp":0.0,"rr":12.62,"hv":74,"rm":75,"dp":103,"lt":274,"aw":37},{"d":"2025-07-03","sl":422,"ah":58.4,"lh":53,"tp":-0.11,"rr":12.62,"hv":73,"rm":126,"dp":93,"lt":203,"aw":41},{"d":"2025-07-04","sl":451,"ah":61.1,"lh":53,"tp":0.02,"rr":12.38,"hv":58,"rm":106,"dp":106,"lt":240,"aw":90},{"d":"2025-07-05","sl":410,"ah":53.3,"lh":49,"tp":-0.25,"rr":12.25,"hv":98,"rm":96,"dp":80,"lt":234,"aw":51},{"d":"2025-07-06","sl":455,"ah":56.2,"lh":51,"tp":-0.36,"rr":12.25,"hv":72,"rm":128,"dp":105,"lt":222,"aw":45},{"d":"2025-07-07","sl":440,"ah":58.5,"lh":53,"tp":-0.02,"rr":12.12,"hv":75,"rm":98,"dp":106,"lt":236,"aw":44},{"d":"2025-07-08","sl":426,"ah":52.2,"lh":45,"tp":-0.02,"rr":12.75,"hv":78,"rm":102,"dp":110,"lt":214,"aw":63},{"d":"2025-07-09","sl":430,"ah":59.2,"lh":54,"tp":0.04,"rr":12.5,"hv":63,"rm":140,"dp":86,"lt":205,"aw":28},{"d":"2025-07-10","sl":426,"ah":55.9,"lh":50,"tp":0.09,"rr":12.5,"hv":94,"rm":104,"dp":94,"lt":228,"aw":45},{"d":"2025-07-11","sl":456,"ah":60.3,"lh":52,"tp":-0.01,"rr":12.62,"hv":61,"rm":119,"dp":99,"lt":238,"aw":35},{"d":"2025-07-12","sl":428,"ah":56.6,"lh":48,"tp":0.05,"rr":12.38,"hv":81,"rm":92,"dp":127,"lt":210,"aw":82},{"d":"2025-07-13","sl":438,"ah":55.6,"lh":50,"tp":-0.04,"rr":12.5,"hv":81,"rm":104,"dp":106,"lt":228,"aw":58},{"d":"2025-07-14","sl":431,"ah":57.1,"lh":52,"tp":-0.14,"rr":12.5,"hv":77,"rm":136,"dp":96,"lt":198,"aw":23},{"d":"2025-07-15","sl":448,"ah":59.7,"lh":54,"tp":0.02,"rr":12.75,"hv":60,"rm":102,"dp":116,"lt":230,"aw":34},{"d":"2025-07-16","sl":453,"ah":57.9,"lh":52,"tp":-0.09,"rr":12.5,"hv":67,"rm":104,"dp":110,"lt":239,"aw":27},{"d":"2025-07-17","sl":444,"ah":59.6,"lh":52,"tp":-0.03,"rr":12.62,"hv":64,"rm":85,"dp":95,"lt":264,"aw":33},{"d":"2025-07-18","sl":442,"ah":59.8,"lh":53,"tp":0.03,"rr":12.62,"hv":62,"rm":108,"dp":86,"lt":247,"aw":36},{"d":"2025-07-19","sl":455,"ah":55.2,"lh":48,"tp":-0.15,"rr":12.5,"hv":86,"rm":128,"dp":91,"lt":236,"aw":50},{"d":"2025-07-20","sl":380,"ah":65.5,"lh":60,"tp":0.1,"rr":12.75,"hv":34,"rm":57,"dp":94,"lt":230,"aw":98},{"d":"2025-07-21","sl":451,"ah":53.0,"lh":48,"tp":-0.06,"rr":13.38,"hv":81,"rm":50,"dp":96,"lt":305,"aw":43},{"d":"2025-07-22","sl":426,"ah":53.0,"lh":48,"tp":-0.27,"rr":12.75,"hv":87,"rm":114,"dp":116,"lt":196,"aw":60},{"d":"2025-07-23","sl":430,"ah":53.5,"lh":46,"tp":-0.21,"rr":12.88,"hv":86,"rm":87,"dp":87,"lt":256,"aw":46},{"d":"2025-07-24","sl":468,"ah":54.6,"lh":49,"tp":0.11,"rr":13.0,"hv":100,"rm":128,"dp":112,"lt":228,"aw":34},{"d":"2025-07-25","sl":420,"ah":55.5,"lh":50,"tp":0.02,"rr":12.5,"hv":101,"rm":93,"dp":94,"lt":234,"aw":63},{"d":"2025-07-26","sl":486,"ah":59.5,"lh":49,"tp":0.1,"rr":12.75,"hv":70,"rm":110,"dp":124,"lt":252,"aw":42},{"d":"2025-07-27","sl":448,"ah":56.3,"lh":50,"tp":-0.27,"rr":12.38,"hv":74,"rm":126,"dp":98,"lt":224,"aw":19},{"d":"2025-07-28","sl":392,"ah":58.5,"lh":54,"tp":-0.11,"rr":12.5,"hv":78,"rm":106,"dp":82,"lt":204,"aw":42},{"d":"2025-07-29","sl":455,"ah":58.1,"lh":48,"tp":0.17,"rr":12.62,"hv":90,"rm":76,"dp":115,"lt":264,"aw":33},{"d":"2025-07-30","sl":443,"ah":57.9,"lh":52,"tp":0.02,"rr":12.25,"hv":79,"rm":122,"dp":108,"lt":212,"aw":47},{"d":"2025-07-31","sl":448,"ah":57.6,"lh":54,"tp":-0.09,"rr":12.38,"hv":76,"rm":101,"dp":80,"lt":267,"aw":16},{"d":"2025-08-01","sl":418,"ah":56.7,"lh":49,"tp":-0.16,"rr":12.25,"hv":81,"rm":128,"dp":101,"lt":188,"aw":63},{"d":"2025-08-02","sl":480,"ah":56.6,"lh":47,"tp":0.25,"rr":12.88,"hv":81,"rm":54,"dp":127,"lt":299,"aw":68},{"d":"2025-08-03","sl":434,"ah":52.8,"lh":47,"tp":-0.14,"rr":12.5,"hv":123,"rm":111,"dp":110,"lt":213,"aw":29},{"d":"2025-08-04","sl":426,"ah":58.7,"lh":52,"tp":-0.08,"rr":12.5,"hv":74,"rm":100,"dp":110,"lt":215,"aw":41},{"d":"2025-08-05","sl":438,"ah":60.2,"lh":52,"tp":-0.01,"rr":12.62,"hv":57,"rm":84,"dp":95,"lt":260,"aw":55},{"d":"2025-08-06","sl":428,"ah":55.9,"lh":50,"tp":-0.08,"rr":12.5,"hv":74,"rm":95,"dp":117,"lt":216,"aw":29},{"d":"2025-08-07","sl":449,"ah":57.8,"lh":51,"tp":0.03,"rr":12.5,"hv":83,"rm":113,"dp":94,"lt":242,"aw":33},{"d":"2025-08-08","sl":359,"ah":58.8,"lh":54,"tp":0.12,"rr":12.25,"hv":60,"rm":85,"dp":104,"lt":170,"aw":54},{"d":"2025-08-09","sl":460,"ah":55.2,"lh":45,"tp":0.06,"rr":12.0,"hv":93,"rm":132,"dp":112,"lt":216,"aw":63},{"d":"2025-08-10","sl":445,"ah":52.2,"lh":48,"tp":-0.15,"rr":12.0,"hv":102,"rm":124,"dp":126,"lt":196,"aw":58},{"d":"2025-08-11","sl":418,"ah":60.4,"lh":57,"tp":0.17,"rr":12.38,"hv":51,"rm":107,"dp":68,"lt":244,"aw":43},{"d":"2025-08-12","sl":414,"ah":57.5,"lh":53,"tp":0.01,"rr":12.62,"hv":59,"rm":94,"dp":108,"lt":213,"aw":60},{"d":"2025-08-13","sl":390,"ah":52.4,"lh":47,"tp":0.22,"rr":13.12,"hv":80,"rm":84,"dp":109,"lt":196,"aw":86},{"d":"2025-08-14","sl":443,"ah":56.6,"lh":50,"tp":0.23,"rr":12.88,"hv":53,"rm":54,"dp":96,"lt":292,"aw":43},{"d":"2025-08-15","sl":456,"ah":57.3,"lh":49,"tp":-0.03,"rr":12.75,"hv":61,"rm":70,"dp":123,"lt":263,"aw":41},{"d":"2025-08-16","sl":412,"ah":57.5,"lh":49,"tp":0.12,"rr":12.5,"hv":58,"rm":92,"dp":102,"lt":218,"aw":69},{"d":"2025-08-17","sl":458,"ah":58.4,"lh":48,"tp":0.04,"rr":12.75,"hv":81,"rm":102,"dp":100,"lt":256,"aw":42},{"d":"2025-08-18","sl":405,"ah":62.3,"lh":55,"tp":0.01,"rr":12.5,"hv":47,"rm":64,"dp":88,"lt":253,"aw":92},{"d":"2025-08-19","sl":464,"ah":54.0,"lh":48,"tp":0.1,"rr":13.12,"hv":90,"rm":82,"dp":119,"lt":264,"aw":51},{"d":"2025-08-20","sl":436,"ah":56.1,"lh":50,"tp":0.1,"rr":12.75,"hv":66,"rm":86,"dp":108,"lt":242,"aw":64},{"d":"2025-08-21","sl":444,"ah":54.4,"lh":49,"tp":0.19,"rr":12.5,"hv":101,"rm":100,"dp":108,"lt":236,"aw":53},{"d":"2025-08-22","sl":446,"ah":54.5,"lh":48,"tp":-0.11,"rr":12.88,"hv":85,"rm":86,"dp":110,"lt":250,"aw":44},{"d":"2025-08-23","sl":439,"ah":53.6,"lh":46,"tp":0.03,"rr":12.5,"hv":81,"rm":64,"dp":100,"lt":274,"aw":89},{"d":"2025-08-24","sl":470,"ah":58.0,"lh":48,"tp":0.17,"rr":12.5,"hv":70,"rm":122,"dp":112,"lt":235,"aw":31},{"d":"2025-08-25","sl":446,"ah":61.7,"lh":56,"tp":0.06,"rr":12.75,"hv":53,"rm":108,"dp":115,"lt":222,"aw":45},{"d":"2025-08-26","sl":442,"ah":54.5,"lh":49,"tp":-0.08,"rr":12.62,"hv":86,"rm":94,"dp":116,"lt":232,"aw":45},{"d":"2025-08-27","sl":446,"ah":59.0,"lh":51,"tp":0.14,"rr":12.5,"hv":67,"rm":76,"dp":100,"lt":270,"aw":47},{"d":"2025-08-28","sl":454,"ah":56.4,"lh":46,"tp":0.18,"rr":12.38,"hv":85,"rm":102,"dp":114,"lt":238,"aw":48},{"d":"2025-08-29","sl":431,"ah":54.6,"lh":47,"tp":-0.14,"rr":12.75,"hv":85,"rm":116,"dp":112,"lt":203,"aw":49},{"d":"2025-08-30","sl":450,"ah":55.2,"lh":50,"tp":-0.15,"rr":12.75,"hv":83,"rm":103,"dp":116,"lt":232,"aw":57},{"d":"2025-08-31","sl":419,"ah":61.0,"lh":53,"tp":-0.04,"rr":12.25,"hv":53,"rm":82,"dp":98,"lt":240,"aw":60},{"d":"2025-09-01","sl":424,"ah":62.4,"lh":53,"tp":0.33,"rr":12.5,"hv":48,"rm":78,"dp":94,"lt":252,"aw":91},{"d":"2025-09-02","sl":400,"ah":56.8,"lh":51,"tp":0.38,"rr":13.0,"hv":73,"rm":86,"dp":106,"lt":208,"aw":86},{"d":"2025-09-03","sl":402,"ah":50.7,"lh":47,"tp":-0.03,"rr":12.62,"hv":80,"rm":78,"dp":66,"lt":257,"aw":74},{"d":"2025-09-04","sl":449,"ah":52.4,"lh":46,"tp":0.1,"rr":12.75,"hv":108,"rm":89,"dp":124,"lt":236,"aw":45},{"d":"2025-09-05","sl":438,"ah":52.6,"lh":48,"tp":0.12,"rr":12.25,"hv":100,"rm":84,"dp":122,"lt":234,"aw":60},{"d":"2025-09-06","sl":426,"ah":55.0,"lh":49,"tp":0.01,"rr":12.62,"hv":93,"rm":122,"dp":109,"lt":196,"aw":57},{"d":"2025-09-07","sl":450,"ah":56.7,"lh":49,"tp":-0.18,"rr":12.5,"hv":63,"rm":116,"dp":124,"lt":209,"aw":25},{"d":"2025-09-08","sl":445,"ah":57.7,"lh":49,"tp":-0.15,"rr":12.38,"hv":78,"rm":108,"dp":101,"lt":236,"aw":43},{"d":"2025-09-09","sl":448,"ah":54.5,"lh":48,"tp":-0.05,"rr":12.5,"hv":89,"rm":88,"dp":103,"lt":256,"aw":29},{"d":"2025-09-10","sl":424,"ah":55.7,"lh":51,"tp":0.09,"rr":12.38,"hv":89,"rm":108,"dp":115,"lt":202,"aw":48},{"d":"2025-09-11","sl":422,"ah":53.0,"lh":49,"tp":0.34,"rr":12.25,"hv":121,"rm":124,"dp":91,"lt":206,"aw":77},{"d":"2025-09-12","sl":431,"ah":55.6,"lh":46,"tp":0.05,"rr":12.38,"hv":103,"rm":106,"dp":112,"lt":213,"aw":48},{"d":"2025-09-13","sl":454,"ah":52.9,"lh":47,"tp":-0.13,"rr":12.38,"hv":82,"rm":128,"dp":124,"lt":202,"aw":78},{"d":"2025-09-14","sl":459,"ah":55.8,"lh":48,"tp":0.06,"rr":12.25,"hv":79,"rm":104,"dp":118,"lt":237,"aw":47},{"d":"2025-09-15","sl":449,"ah":57.3,"lh":49,"tp":0.1,"rr":12.38,"hv":81,"rm":92,"dp":116,"lt":240,"aw":34},{"d":"2025-09-16","sl":400,"ah":52.6,"lh":46,"tp":0.08,"rr":12.62,"hv":97,"rm":84,"dp":108,"lt":208,"aw":67},{"d":"2025-09-17","sl":432,"ah":52.3,"lh":47,"tp":0.06,"rr":12.38,"hv":100,"rm":109,"dp":84,"lt":240,"aw":38},{"d":"2025-09-18","sl":444,"ah":53.5,"lh":47,"tp":-0.17,"rr":12.62,"hv":88,"rm":114,"dp":90,"lt":240,"aw":36},{"d":"2025-09-19","sl":368,"ah":55.5,"lh":48,"tp":-0.06,"rr":12.12,"hv":79,"rm":54,"dp":94,"lt":220,"aw":104},{"d":"2025-09-20","sl":445,"ah":52.7,"lh":45,"tp":-0.16,"rr":12.5,"hv":81,"rm":84,"dp":89,"lt":272,"aw":127},{"d":"2025-09-21","sl":452,"ah":56.5,"lh":48,"tp":0.15,"rr":12.5,"hv":95,"rm":110,"dp":116,"lt":226,"aw":37},{"d":"2025-09-22","sl":440,"ah":55.3,"lh":50,"tp":-0.18,"rr":12.62,"hv":73,"rm":63,"dp":104,"lt":273,"aw":44},{"d":"2025-09-23","sl":418,"ah":56.9,"lh":49,"tp":-0.02,"rr":12.62,"hv":79,"rm":100,"dp":84,"lt":235,"aw":42},{"d":"2025-09-24","sl":436,"ah":53.6,"lh":48,"tp":0.29,"rr":12.38,"hv":119,"rm":114,"dp":90,"lt":232,"aw":38},{"d":"2025-09-25","sl":444,"ah":50.0,"lh":46,"tp":-0.09,"rr":12.5,"hv":135,"rm":128,"dp":96,"lt":220,"aw":37},{"d":"2025-09-26","sl":439,"ah":52.1,"lh":46,"tp":-0.01,"rr":12.75,"hv":99,"rm":117,"dp":83,"lt":239,"aw":37},{"d":"2025-09-27","sl":424,"ah":52.5,"lh":45,"tp":-0.03,"rr":12.75,"hv":107,"rm":130,"dp":102,"lt":192,"aw":42},{"d":"2025-09-28","sl":473,"ah":57.5,"lh":49,"tp":0.04,"rr":12.5,"hv":81,"rm":99,"dp":120,"lt":254,"aw":45},{"d":"2025-09-29","sl":426,"ah":57.4,"lh":49,"tp":0.09,"rr":12.38,"hv":82,"rm":90,"dp":100,"lt":235,"aw":47},{"d":"2025-09-30","sl":411,"ah":50.3,"lh":46,"tp":-0.12,"rr":12.38,"hv":97,"rm":102,"dp":78,"lt":232,"aw":57},{"d":"2025-10-01","sl":430,"ah":47.9,"lh":43,"tp":-0.12,"rr":12.38,"hv":125,"rm":126,"dp":126,"lt":177,"aw":63},{"d":"2025-10-02","sl":432,"ah":51.5,"lh":46,"tp":-0.16,"rr":13.25,"hv":84,"rm":91,"dp":88,"lt":254,"aw":55},{"d":"2025-10-03","sl":416,"ah":54.2,"lh":47,"tp":0.21,"rr":12.88,"hv":90,"rm":74,"dp":86,"lt":256,"aw":44},{"d":"2025-10-04","sl":428,"ah":55.8,"lh":49,"tp":-0.15,"rr":12.88,"hv":70,"rm":80,"dp":104,"lt":244,"aw":68},{"d":"2025-10-05","sl":382,"ah":53.0,"lh":47,"tp":-0.04,"rr":12.25,"hv":98,"rm":72,"dp":86,"lt":224,"aw":62},{"d":"2025-10-06","sl":484,"ah":51.2,"lh":46,"tp":0.12,"rr":12.5,"hv":131,"rm":106,"dp":122,"lt":256,"aw":53},{"d":"2025-10-07","sl":441,"ah":50.4,"lh":44,"tp":-0.13,"rr":13.0,"hv":111,"rm":111,"dp":113,"lt":217,"aw":55},{"d":"2025-10-08","sl":446,"ah":52.7,"lh":46,"tp":-0.06,"rr":12.75,"hv":112,"rm":106,"dp":96,"lt":245,"aw":44},{"d":"2025-10-09","sl":444,"ah":54.8,"lh":48,"tp":0.03,"rr":12.88,"hv":84,"rm":126,"dp":91,"lt":226,"aw":25},{"d":"2025-10-10","sl":436,"ah":49.3,"lh":45,"tp":0.1,"rr":12.75,"hv":126,"rm":47,"dp":87,"lt":302,"aw":43},{"d":"2025-10-11","sl":438,"ah":54.8,"lh":48,"tp":0.0,"rr":12.75,"hv":97,"rm":132,"dp":122,"lt":184,"aw":76},{"d":"2025-10-12","sl":431,"ah":61.9,"lh":49,"tp":0.1,"rr":13.0,"hv":51,"rm":94,"dp":74,"lt":263,"aw":48},{"d":"2025-10-13","sl":414,"ah":53.2,"lh":48,"tp":0.12,"rr":12.62,"hv":116,"rm":94,"dp":107,"lt":213,"aw":65},{"d":"2025-10-14","sl":434,"ah":56.7,"lh":50,"tp":0.12,"rr":12.75,"hv":83,"rm":92,"dp":79,"lt":262,"aw":33},{"d":"2025-10-15","sl":420,"ah":55.4,"lh":47,"tp":-0.03,"rr":12.75,"hv":87,"rm":92,"dp":110,"lt":218,"aw":59},{"d":"2025-10-16","sl":437,"ah":52.1,"lh":46,"tp":-0.14,"rr":12.75,"hv":111,"rm":109,"dp":124,"lt":204,"aw":61},{"d":"2025-10-17","sl":458,"ah":58.3,"lh":51,"tp":-0.18,"rr":12.88,"hv":70,"rm":96,"dp":84,"lt":279,"aw":20},{"d":"2025-10-18","sl":444,"ah":57.1,"lh":50,"tp":0.03,"rr":12.25,"hv":86,"rm":116,"dp":108,"lt":220,"aw":78},{"d":"2025-10-19","sl":453,"ah":58.1,"lh":52,"tp":0.18,"rr":12.62,"hv":84,"rm":124,"dp":86,"lt":242,"aw":38},{"d":"2025-10-20","sl":443,"ah":52.8,"lh":45,"tp":-0.02,"rr":12.38,"hv":130,"rm":88,"dp":106,"lt":248,"aw":39},{"d":"2025-10-21","sl":445,"ah":56.5,"lh":50,"tp":0.17,"rr":12.62,"hv":86,"rm":129,"dp":90,"lt":226,"aw":38},{"d":"2025-10-22","sl":442,"ah":53.8,"lh":49,"tp":-0.02,"rr":12.75,"hv":113,"rm":106,"dp":88,"lt":246,"aw":37},{"d":"2025-10-23","sl":422,"ah":53.2,"lh":48,"tp":-0.1,"rr":12.12,"hv":121,"rm":106,"dp":113,"lt":203,"aw":68},{"d":"2025-10-24","sl":445,"ah":53.2,"lh":48,"tp":-0.02,"rr":12.25,"hv":111,"rm":114,"dp":106,"lt":224,"aw":44},{"d":"2025-10-25","sl":456,"ah":55.8,"lh":52,"tp":0.09,"rr":12.25,"hv":92,"rm":134,"dp":87,"lt":236,"aw":77},{"d":"2025-10-26","sl":462,"ah":51.3,"lh":46,"tp":0.0,"rr":12.25,"hv":127,"rm":133,"dp":102,"lt":228,"aw":81},{"d":"2025-10-27","sl":450,"ah":54.5,"lh":48,"tp":-0.18,"rr":12.75,"hv":93,"rm":96,"dp":106,"lt":246,"aw":27},{"d":"2025-10-28","sl":432,"ah":58.7,"lh":54,"tp":0.02,"rr":12.62,"hv":73,"rm":124,"dp":74,"lt":234,"aw":48},{"d":"2025-10-29","sl":436,"ah":55.2,"lh":48,"tp":0.09,"rr":12.5,"hv":97,"rm":96,"dp":102,"lt":238,"aw":46},{"d":"2025-10-30","sl":406,"ah":57.3,"lh":51,"tp":-0.15,"rr":12.25,"hv":81,"rm":102,"dp":116,"lt":188,"aw":69},{"d":"2025-10-31","sl":417,"ah":54.4,"lh":49,"tp":0.08,"rr":12.38,"hv":111,"rm":121,"dp":96,"lt":200,"aw":48},{"d":"2025-11-01","sl":385,"ah":56.1,"lh":50,"tp":0.22,"rr":12.62,"hv":94,"rm":59,"dp":112,"lt":214,"aw":149},{"d":"2025-11-02","sl":457,"ah":54.4,"lh":47,"tp":0.1,"rr":12.25,"hv":97,"rm":114,"dp":114,"lt":230,"aw":137},{"d":"2025-11-03","sl":458,"ah":54.8,"lh":47,"tp":-0.22,"rr":12.5,"hv":90,"rm":102,"dp":125,"lt":231,"aw":28},{"d":"2025-11-04","sl":388,"ah":56.6,"lh":51,"tp":-0.08,"rr":12.25,"hv":93,"rm":88,"dp":112,"lt":189,"aw":89},{"d":"2025-11-05","sl":396,"ah":59.2,"lh":52,"tp":-0.01,"rr":13.0,"hv":68,"rm":96,"dp":97,"lt":202,"aw":79},{"d":"2025-11-06","sl":434,"ah":55.0,"lh":49,"tp":0.06,"rr":12.88,"hv":85,"rm":102,"dp":122,"lt":209,"aw":44},{"d":"2025-11-07","sl":436,"ah":57.6,"lh":52,"tp":-0.16,"rr":12.88,"hv":72,"rm":121,"dp":98,"lt":218,"aw":48},{"d":"2025-11-08","sl":411,"ah":58.6,"lh":53,"tp":0.0,"rr":12.75,"hv":69,"rm":102,"dp":91,"lt":218,"aw":140},{"d":"2025-11-09","sl":449,"ah":57.4,"lh":51,"tp":-0.06,"rr":12.25,"hv":83,"rm":104,"dp":71,"lt":274,"aw":98},{"d":"2025-11-10","sl":395,"ah":54.7,"lh":49,"tp":0.16,"rr":12.25,"hv":114,"rm":88,"dp":94,"lt":214,"aw":79},{"d":"2025-11-11","sl":436,"ah":51.6,"lh":46,"tp":-0.12,"rr":12.5,"hv":120,"rm":122,"dp":104,"lt":210,"aw":37},{"d":"2025-11-12","sl":432,"ah":59.0,"lh":52,"tp":0.08,"rr":12.5,"hv":66,"rm":96,"dp":78,"lt":258,"aw":44},{"d":"2025-11-13","sl":420,"ah":59.9,"lh":49,"tp":0.28,"rr":12.5,"hv":65,"rm":82,"dp":84,"lt":254,"aw":56},{"d":"2025-11-14","sl":428,"ah":60.7,"lh":52,"tp":0.19,"rr":13.0,"hv":57,"rm":72,"dp":129,"lt":228,"aw":47},{"d":"2025-11-15","sl":429,"ah":61.4,"lh":54,"tp":0.23,"rr":12.75,"hv":48,"rm":88,"dp":112,"lt":229,"aw":134},{"d":"2025-11-16","sl":410,"ah":65.0,"lh":57,"tp":0.47,"rr":12.88,"hv":31,"rm":97,"dp":117,"lt":196,"aw":42},{"d":"2025-11-17","sl":488,"ah":62.5,"lh":53,"tp":0.13,"rr":12.38,"hv":47,"rm":93,"dp":110,"lt":285,"aw":121},{"d":"2025-11-18","sl":498,"ah":62.7,"lh":54,"tp":0.11,"rr":12.75,"hv":48,"rm":115,"dp":93,"lt":290,"aw":44},{"d":"2025-11-19","sl":486,"ah":60.8,"lh":52,"tp":-0.16,"rr":12.75,"hv":61,"rm":102,"dp":114,"lt":271,"aw":72},{"d":"2025-11-20","sl":429,"ah":64.3,"lh":52,"tp":0.23,"rr":13.0,"hv":46,"rm":100,"dp":98,"lt":231,"aw":47},{"d":"2025-11-21","sl":460,"ah":56.9,"lh":51,"tp":-0.2,"rr":12.88,"hv":74,"rm":130,"dp":117,"lt":212,"aw":24},{"d":"2025-11-22","sl":452,"ah":57.7,"lh":52,"tp":0.01,"rr":12.62,"hv":72,"rm":91,"dp":98,"lt":262,"aw":38},{"d":"2025-11-23","sl":460,"ah":53.5,"lh":47,"tp":-0.31,"rr":12.38,"hv":82,"rm":116,"dp":102,"lt":242,"aw":33},{"d":"2025-11-24","sl":442,"ah":56.4,"lh":52,"tp":-0.17,"rr":12.88,"hv":73,"rm":94,"dp":97,"lt":251,"aw":34},{"d":"2025-11-25","sl":386,"ah":64.4,"lh":55,"tp":0.3,"rr":12.88,"hv":37,"rm":76,"dp":108,"lt":201,"aw":85},{"d":"2025-11-26","sl":429,"ah":62.7,"lh":50,"tp":0.51,"rr":13.12,"hv":51,"rm":128,"dp":104,"lt":198,"aw":30},{"d":"2025-11-27","sl":444,"ah":56.6,"lh":48,"tp":-0.14,"rr":12.25,"hv":80,"rm":92,"dp":116,"lt":235,"aw":58},{"d":"2025-11-28","sl":436,"ah":56.7,"lh":47,"tp":-0.15,"rr":12.0,"hv":82,"rm":86,"dp":80,"lt":270,"aw":94},{"d":"2025-11-29","sl":442,"ah":50.9,"lh":46,"tp":-0.2,"rr":12.12,"hv":123,"rm":126,"dp":126,"lt":190,"aw":44},{"d":"2025-11-30","sl":461,"ah":52.2,"lh":47,"tp":0.07,"rr":12.25,"hv":97,"rm":88,"dp":129,"lt":244,"aw":43},{"d":"2025-12-01","sl":444,"ah":58.2,"lh":51,"tp":0.09,"rr":12.62,"hv":65,"rm":104,"dp":126,"lt":214,"aw":41},{"d":"2025-12-02","sl":426,"ah":54.3,"lh":48,"tp":0.07,"rr":12.62,"hv":102,"rm":100,"dp":114,"lt":212,"aw":38},{"d":"2025-12-03","sl":434,"ah":50.6,"lh":46,"tp":0.14,"rr":12.88,"hv":113,"rm":107,"dp":108,"lt":219,"aw":36},{"d":"2025-12-04","sl":434,"ah":62.9,"lh":53,"tp":0.08,"rr":12.75,"hv":49,"rm":62,"dp":97,"lt":274,"aw":42},{"d":"2025-12-05","sl":404,"ah":55.2,"lh":49,"tp":0.16,"rr":12.38,"hv":96,"rm":86,"dp":101,"lt":217,"aw":75},{"d":"2025-12-06","sl":428,"ah":58.1,"lh":52,"tp":-0.07,"rr":12.25,"hv":68,"rm":88,"dp":123,"lt":217,"aw":63},{"d":"2025-12-07","sl":395,"ah":61.8,"lh":57,"tp":0.09,"rr":12.88,"hv":54,"rm":102,"dp":112,"lt":181,"aw":33},{"d":"2025-12-08","sl":447,"ah":55.5,"lh":50,"tp":0.07,"rr":12.38,"hv":84,"rm":139,"dp":120,"lt":188,"aw":41},{"d":"2025-12-09","sl":416,"ah":66.5,"lh":59,"tp":0.28,"rr":12.88,"hv":37,"rm":121,"dp":144,"lt":150,"aw":43},{"d":"2025-12-10","sl":428,"ah":62.1,"lh":56,"tp":0.06,"rr":12.88,"hv":50,"rm":85,"dp":114,"lt":228,"aw":63},{"d":"2025-12-11","sl":426,"ah":61.5,"lh":53,"tp":0.21,"rr":12.88,"hv":54,"rm":117,"dp":95,"lt":214,"aw":40},{"d":"2025-12-12","sl":358,"ah":61.1,"lh":54,"tp":0.27,"rr":12.25,"hv":68,"rm":71,"dp":92,"lt":195,"aw":91},{"d":"2025-12-13","sl":454,"ah":60.3,"lh":49,"tp":-0.11,"rr":12.62,"hv":63,"rm":108,"dp":100,"lt":246,"aw":41},{"d":"2025-12-14","sl":514,"ah":56.3,"lh":49,"tp":-0.12,"rr":12.38,"hv":86,"rm":131,"dp":108,"lt":276,"aw":55},{"d":"2025-12-15","sl":444,"ah":59.2,"lh":51,"tp":0.09,"rr":12.5,"hv":74,"rm":92,"dp":94,"lt":258,"aw":40},{"d":"2025-12-16","sl":446,"ah":55.0,"lh":49,"tp":0.04,"rr":12.62,"hv":112,"rm":108,"dp":103,"lt":236,"aw":67},{"d":"2025-12-17","sl":414,"ah":57.0,"lh":51,"tp":0.0,"rr":12.62,"hv":87,"rm":108,"dp":96,"lt":210,"aw":60},{"d":"2025-12-18","sl":424,"ah":55.2,"lh":48,"tp":-0.2,"rr":12.62,"hv":96,"rm":104,"dp":110,"lt":210,"aw":62},{"d":"2025-12-19","sl":444,"ah":59.9,"lh":50,"tp":0.02,"rr":12.75,"hv":64,"rm":84,"dp":89,"lt":271,"aw":38},{"d":"2025-12-20","sl":442,"ah":55.9,"lh":48,"tp":-0.03,"rr":12.5,"hv":77,"rm":86,"dp":102,"lt":254,"aw":83},{"d":"2025-12-21","sl":434,"ah":59.8,"lh":54,"tp":0.02,"rr":12.62,"hv":55,"rm":112,"dp":109,"lt":214,"aw":55},{"d":"2025-12-22","sl":414,"ah":59.0,"lh":52,"tp":-0.1,"rr":12.38,"hv":63,"rm":96,"dp":136,"lt":182,"aw":65},{"d":"2025-12-23","sl":430,"ah":61.1,"lh":57,"tp":0.27,"rr":12.5,"hv":58,"rm":97,"dp":125,"lt":208,"aw":52},{"d":"2025-12-24","sl":435,"ah":59.2,"lh":52,"tp":-0.02,"rr":12.5,"hv":65,"rm":78,"dp":105,"lt":252,"aw":37},{"d":"2025-12-25","sl":454,"ah":54.5,"lh":49,"tp":-0.06,"rr":12.62,"hv":82,"rm":110,"dp":100,"lt":245,"aw":34},{"d":"2025-12-26","sl":456,"ah":56.4,"lh":52,"tp":-0.38,"rr":12.12,"hv":71,"rm":106,"dp":101,"lt":248,"aw":100},{"d":"2025-12-28","sl":426,"ah":57.0,"lh":52,"tp":-0.22,"rr":12.12,"hv":63,"rm":91,"dp":102,"lt":233,"aw":46},{"d":"2025-12-29","sl":419,"ah":60.9,"lh":50,"tp":0.06,"rr":12.38,"hv":54,"rm":84,"dp":86,"lt":250,"aw":64},{"d":"2025-12-30","sl":486,"ah":57.0,"lh":51,"tp":0.01,"rr":12.12,"hv":80,"rm":77,"dp":106,"lt":303,"aw":80},{"d":"2025-12-31","sl":464,"ah":53.0,"lh":48,"tp":-0.03,"rr":12.25,"hv":104,"rm":136,"dp":114,"lt":213,"aw":57},{"d":"2026-01-01","sl":414,"ah":55.4,"lh":50,"tp":-0.25,"rr":12.12,"hv":86,"rm":99,"dp":102,"lt":214,"aw":48},{"d":"2026-01-02","sl":454,"ah":56.8,"lh":52,"tp":-0.05,"rr":12.25,"hv":76,"rm":100,"dp":120,"lt":234,"aw":48},{"d":"2026-01-03","sl":438,"ah":55.5,"lh":50,"tp":-0.03,"rr":12.38,"hv":87,"rm":122,"dp":116,"lt":200,"aw":44},{"d":"2026-01-04","sl":474,"ah":57.3,"lh":50,"tp":0.09,"rr":12.0,"hv":89,"rm":126,"dp":117,"lt":230,"aw":95},{"d":"2026-01-05","sl":424,"ah":50.2,"lh":45,"tp":-0.01,"rr":12.38,"hv":117,"rm":117,"dp":88,"lt":219,"aw":38},{"d":"2026-01-06","sl":428,"ah":56.9,"lh":51,"tp":0.0,"rr":12.62,"hv":77,"rm":110,"dp":104,"lt":214,"aw":41},{"d":"2026-01-07","sl":422,"ah":52.8,"lh":47,"tp":0.01,"rr":12.5,"hv":100,"rm":116,"dp":103,"lt":204,"aw":53},{"d":"2026-01-08","sl":415,"ah":60.0,"lh":54,"tp":-0.07,"rr":12.88,"hv":57,"rm":87,"dp":102,"lt":226,"aw":60},{"d":"2026-01-09","sl":424,"ah":60.3,"lh":54,"tp":0.15,"rr":12.88,"hv":57,"rm":86,"dp":124,"lt":214,"aw":51},{"d":"2026-01-10","sl":476,"ah":57.7,"lh":51,"tp":0.04,"rr":12.5,"hv":79,"rm":129,"dp":126,"lt":220,"aw":98},{"d":"2026-01-11","sl":468,"ah":60.4,"lh":53,"tp":-0.01,"rr":12.25,"hv":62,"rm":112,"dp":92,"lt":265,"aw":87},{"d":"2026-01-12","sl":442,"ah":54.1,"lh":48,"tp":0.25,"rr":12.12,"hv":100,"rm":88,"dp":122,"lt":232,"aw":35},{"d":"2026-01-13","sl":412,"ah":57.6,"lh":50,"tp":-0.04,"rr":12.5,"hv":73,"rm":98,"dp":130,"lt":185,"aw":59},{"d":"2026-01-14","sl":387,"ah":64.1,"lh":59,"tp":0.17,"rr":12.38,"hv":41,"rm":73,"dp":99,"lt":215,"aw":69},{"d":"2026-01-15","sl":432,"ah":60.5,"lh":51,"tp":0.18,"rr":13.0,"hv":59,"rm":104,"dp":139,"lt":190,"aw":49},{"d":"2026-01-16","sl":410,"ah":58.9,"lh":52,"tp":0.16,"rr":12.62,"hv":72,"rm":102,"dp":98,"lt":210,"aw":50},{"d":"2026-01-17","sl":456,"ah":56.9,"lh":50,"tp":-0.17,"rr":12.25,"hv":79,"rm":140,"dp":96,"lt":220,"aw":78},{"d":"2026-01-18","sl":443,"ah":54.2,"lh":44,"tp":-0.41,"rr":12.0,"hv":103,"rm":83,"dp":111,"lt":249,"aw":78},{"d":"2026-01-19","sl":464,"ah":59.3,"lh":49,"tp":0.15,"rr":12.25,"hv":72,"rm":98,"dp":104,"lt":262,"aw":130},{"d":"2026-01-20","sl":445,"ah":55.5,"lh":49,"tp":0.13,"rr":12.38,"hv":98,"rm":76,"dp":111,"lt":258,"aw":55},{"d":"2026-01-21","sl":466,"ah":60.7,"lh":54,"tp":-0.04,"rr":12.62,"hv":59,"rm":114,"dp":108,"lt":243,"aw":49},{"d":"2026-01-23","sl":448,"ah":61.5,"lh":52,"tp":0.07,"rr":12.25,"hv":61,"rm":102,"dp":94,"lt":252,"aw":50},{"d":"2026-01-24","sl":459,"ah":60.3,"lh":51,"tp":0.12,"rr":12.38,"hv":71,"rm":96,"dp":104,"lt":258,"aw":73},{"d":"2026-01-25","sl":408,"ah":58.2,"lh":52,"tp":0.06,"rr":12.38,"hv":83,"rm":96,"dp":76,"lt":236,"aw":79},{"d":"2026-01-26","sl":444,"ah":57.8,"lh":53,"tp":0.09,"rr":11.88,"hv":82,"rm":116,"dp":106,"lt":221,"aw":52},{"d":"2026-01-27","sl":320,"ah":54.0,"lh":48,"tp":-0.2,"rr":12.12,"hv":129,"rm":56,"dp":65,"lt":198,"aw":66},{"d":"2026-01-28","sl":446,"ah":57.5,"lh":50,"tp":-0.12,"rr":12.75,"hv":88,"rm":117,"dp":112,"lt":217,"aw":46},{"d":"2026-01-29","sl":378,"ah":59.6,"lh":54,"tp":0.1,"rr":12.5,"hv":69,"rm":110,"dp":99,"lt":168,"aw":125},{"d":"2026-01-30","sl":355,"ah":61.5,"lh":54,"tp":-0.19,"rr":12.25,"hv":48,"rm":64,"dp":107,"lt":184,"aw":90},{"d":"2026-01-31","sl":448,"ah":62.8,"lh":54,"tp":-0.05,"rr":12.88,"hv":48,"rm":116,"dp":109,"lt":224,"aw":33},{"d":"2026-02-01","sl":466,"ah":58.5,"lh":50,"tp":0.12,"rr":12.5,"hv":78,"rm":95,"dp":111,"lt":260,"aw":47},{"d":"2026-02-02","sl":449,"ah":56.2,"lh":48,"tp":0.16,"rr":12.12,"hv":91,"rm":109,"dp":84,"lt":256,"aw":39},{"d":"2026-02-03","sl":404,"ah":61.4,"lh":52,"tp":-0.02,"rr":12.12,"hv":49,"rm":107,"dp":118,"lt":178,"aw":84},{"d":"2026-02-04","sl":405,"ah":57.7,"lh":53,"tp":-0.07,"rr":12.0,"hv":77,"rm":88,"dp":104,"lt":212,"aw":80},{"d":"2026-02-05","sl":438,"ah":64.5,"lh":53,"tp":0.16,"rr":12.88,"hv":46,"rm":78,"dp":96,"lt":264,"aw":47},{"d":"2026-02-07","sl":432,"ah":59.5,"lh":52,"tp":0.07,"rr":12.75,"hv":56,"rm":90,"dp":122,"lt":218,"aw":105},{"d":"2026-02-09","sl":431,"ah":58.1,"lh":53,"tp":-0.09,"rr":12.38,"hv":69,"rm":104,"dp":93,"lt":234,"aw":40},{"d":"2026-02-10","sl":430,"ah":60.8,"lh":56,"tp":0.16,"rr":12.25,"hv":59,"rm":105,"dp":86,"lt":239,"aw":55}]
+
+const DEFAULT_ROUTES=["Riverwalk","Lakefront","Naples","Lemont","Washington DC"];
+const DEFAULT_SHOES=["Pegasus 41","Alphafly 3","Invincible 3","Vomero Plus","Streakfly","Streakfly 2","Tempo Next%","Vaporfly 2","Invincible 2 (2)","Pegasus 39","Pegasus 39 2","Alphafly 2","Invincible 2","Pegasus 38","Zoom Fly 3","Trail 4 GTX"];
+let ROUTES=[...DEFAULT_ROUTES];
+let SHOES=[...DEFAULT_SHOES];
+
+const R0=[];
+
+let weights = W0.map(x=>({date:x.d, weight:x.w}));
+let runs = R0.map(x=>({date:x.d, route:x.r, pace:x.p, mileage:x.m, time:x.t||'', shoe:x.s||'', avgHR:x.h||'', notes:x.n||''}));
+let currentView = 'dashboard';
+let currentRange = '1y';
+let weightChart, paceChart, monthlyChart, routeChart;
+let sleepChart, hrChart, tempChart, respChart, hrvChart, stagesChart;
+
+// ═══ PERSISTENCE ═══
+function saveData() {
+  try { localStorage.setItem('stride-w', JSON.stringify(weights)); localStorage.setItem('stride-r', JSON.stringify(runs)); localStorage.setItem('stride-routes', JSON.stringify(ROUTES)); localStorage.setItem('stride-shoes', JSON.stringify(SHOES)); } catch(e){}
+}
+function loadData() {
+  try {
+    const sw = localStorage.getItem('stride-w');
+    if(sw){const p=JSON.parse(sw); if(p.length>0) weights=p;}
+    const sr = localStorage.getItem('stride-r');
+    if(sr){const p=JSON.parse(sr); if(p.length>0) runs=p;}
+    const sRoutes = localStorage.getItem('stride-routes');
+    if(sRoutes){const p=JSON.parse(sRoutes); if(p.length>=DEFAULT_ROUTES.length) ROUTES=p;}
+    const sShoes = localStorage.getItem('stride-shoes');
+    if(sShoes){const p=JSON.parse(sShoes); if(p.length>=DEFAULT_SHOES.length) SHOES=p;}
+  } catch(e){}
+}
+
+// ═══ UTILITIES ═══
+const toISO = d => d.toISOString().split('T')[0];
+const fmtD = d => { const dt=new Date(d+'T12:00:00'); return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+const fmtFull = d => { const dt=new Date(d+'T12:00:00'); return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
+function parsePace(s){if(!s)return null;const m=s.match(/^(\d+):(\d{2})$/);return m?parseInt(m[1])+parseInt(m[2])/60:null;}
+function fmtPace(v){if(!v)return'—';const m=Math.floor(v),s=Math.round((v-m)*60);return`${m}:${s.toString().padStart(2,'0')}`;}
+
+function filterByRange(arr) {
+  const now=new Date(), cut=new Date();
+  if(currentRange==='1w') cut.setDate(now.getDate()-7);
+  else if(currentRange==='1m') cut.setMonth(now.getMonth()-1);
+  else if(currentRange==='3m') cut.setMonth(now.getMonth()-3);
+  else if(currentRange==='6m') cut.setMonth(now.getMonth()-6);
+  else if(currentRange==='1y') cut.setFullYear(now.getFullYear()-1);
+  else cut.setFullYear(2000);
+  return arr.filter(x=>new Date(x.date)>=cut).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function calcStats(arr, key) {
+  if(!arr.length)return{};
+  const v=arr.map(x=>x[key]);
+  const avg=v.reduce((a,b)=>a+b)/v.length;
+  const std=Math.sqrt(v.reduce((s,x)=>s+(x-avg)**2,0)/v.length);
+  return{avg,std,min:Math.min(...v),max:Math.max(...v),count:v.length,last:v[v.length-1]};
+}
+
+function movingAvg(arr, key, win=7) {
+  return arr.map((item,i)=>{
+    const start=Math.max(0,i-win+1);
+    const slice=arr.slice(start,i+1);
+    return Math.round(slice.reduce((s,d)=>s+d[key],0)/slice.length*10)/10;
+  });
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.remove('hidden');
+  setTimeout(()=>t.classList.add('hidden'),2200);
+}
+
+// ═══ NAVIGATION ═══
+function switchView(v) {
+  currentView=v;
+  ['dashboard','log-weight','log-run','insights','health','strava'].forEach(id=>{
+    document.getElementById('view-'+id).classList.toggle('hidden',id!==v);
+  });
+  document.querySelectorAll('.nav-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.textContent.toLowerCase().replace(' ','-')===v);
+  });
+  if(v==='dashboard') renderDashboard();
+  if(v==='insights') renderInsights();
+  if(v==='health') renderHealth();
+  if(v==='strava') renderStrava();
+  if(v==='log-weight') { document.getElementById('wDate').value=toISO(new Date()); updateWeightFormHint(); }
+  if(v==='log-run') document.getElementById('rDate').value=toISO(new Date());
+}
+
+// ═══ COLLAPSIBLE ═══
+function toggleCollapse(titleEl) {
+  const card=titleEl.closest('.collapsible');
+  const body=card.querySelector('.collapsible-body');
+  const arrow=titleEl.querySelector('.collapse-arrow');
+  const isCollapsed=body.classList.contains('collapsed');
+  if(isCollapsed) {
+    body.style.maxHeight=body.scrollHeight+'px';
+    body.style.opacity='1';
+    body.classList.remove('collapsed');
+    arrow.classList.add('open');
+    // After transition, allow natural height for dynamic content
+    setTimeout(()=>{if(!body.classList.contains('collapsed'))body.style.maxHeight='none';},350);
+  } else {
+    body.style.maxHeight=body.scrollHeight+'px';
+    requestAnimationFrame(()=>{body.style.maxHeight='0';body.style.opacity='0';});
+    body.classList.add('collapsed');
+    arrow.classList.remove('open');
+  }
+}
+
+// ═══ THEMES ═══
+const THEMES={
+  default:{
+    name:'Default',desc:'Dark navy with red accents',
+    bg:'#07080f',surface:'#0f1119',surface2:'#161822',border:'rgba(255,255,255,0.06)',
+    accent:'#e63946',accentGlow:'rgba(230,57,70,0.15)',accent2:'#457b9d',
+    green:'#2ec4b6',orange:'#f77f00',text:'#e8eaed',dim:'#6b7280',dim2:'#3d4250',
+    headerBg:'linear-gradient(165deg, #07080f 0%, #111827 40%, #0c1929 100%)',
+    logoBg:'linear-gradient(135deg, #e63946, #c1121f)',logoText:'linear-gradient(135deg, #e63946, #f77f00)'
+  },
+  midnight:{
+    name:'Midnight',desc:'Deep blue with electric cyan',
+    bg:'#060a14',surface:'#0b1120',surface2:'#11192e',border:'rgba(100,160,255,0.06)',
+    accent:'#38bdf8',accentGlow:'rgba(56,189,248,0.15)',accent2:'#818cf8',
+    green:'#34d399',orange:'#fb923c',text:'#e2e8f0',dim:'#64748b',dim2:'#334155',
+    headerBg:'linear-gradient(165deg, #060a14 0%, #0c1631 40%, #0a1228 100%)',
+    logoBg:'linear-gradient(135deg, #38bdf8, #818cf8)',logoText:'linear-gradient(135deg, #38bdf8, #818cf8)'
+  },
+  ember:{
+    name:'Ember',desc:'Warm charcoal with amber glow',
+    bg:'#0f0b08',surface:'#181210',surface2:'#211a16',border:'rgba(255,180,100,0.06)',
+    accent:'#f59e0b',accentGlow:'rgba(245,158,11,0.15)',accent2:'#d97706',
+    green:'#10b981',orange:'#ef4444',text:'#fef3c7',dim:'#92785a',dim2:'#4a3c2c',
+    headerBg:'linear-gradient(165deg, #0f0b08 0%, #1a1410 40%, #181008 100%)',
+    logoBg:'linear-gradient(135deg, #f59e0b, #d97706)',logoText:'linear-gradient(135deg, #f59e0b, #ef4444)'
+  },
+  forest:{
+    name:'Forest',desc:'Deep green with emerald highlights',
+    bg:'#070d0a',surface:'#0d1612',surface2:'#141f1a',border:'rgba(100,220,160,0.06)',
+    accent:'#10b981',accentGlow:'rgba(16,185,129,0.15)',accent2:'#6ee7b7',
+    green:'#34d399',orange:'#fbbf24',text:'#d1fae5',dim:'#6b8a7a',dim2:'#2d4a3c',
+    headerBg:'linear-gradient(165deg, #070d0a 0%, #0e1c14 40%, #0a1810 100%)',
+    logoBg:'linear-gradient(135deg, #10b981, #059669)',logoText:'linear-gradient(135deg, #10b981, #6ee7b7)'
+  }
+};
+
+function applyTheme(id) {
+  const t=THEMES[id]; if(!t)return;
+  const r=document.documentElement.style;
+  r.setProperty('--bg',t.bg);
+  r.setProperty('--surface',t.surface);
+  r.setProperty('--surface2',t.surface2);
+  r.setProperty('--border',t.border);
+  r.setProperty('--accent',t.accent);
+  r.setProperty('--accent-glow',t.accentGlow);
+  r.setProperty('--accent2',t.accent2);
+  r.setProperty('--green',t.green);
+  r.setProperty('--orange',t.orange);
+  r.setProperty('--text',t.text);
+  r.setProperty('--dim',t.dim);
+  r.setProperty('--dim2',t.dim2);
+  document.querySelector('.header').style.background=t.headerBg;
+  document.querySelector('.logo-icon').style.background=t.logoBg;
+  const lt=document.querySelector('.logo-text');
+  lt.style.background=t.logoText;
+  lt.style.webkitBackgroundClip='text';
+  lt.style.webkitTextFillColor='transparent';
+  currentTheme=id;
+  localStorage.setItem('stride-theme',id);
+  renderThemeGrid();
+}
+
+let currentTheme='default';
+
+function renderThemeGrid() {
+  const grid=document.getElementById('theme-grid');
+  grid.innerHTML=Object.entries(THEMES).map(([id,t])=>{
+    const active=id===currentTheme?'active':'';
+    return `<div class="theme-option ${active}" onclick="applyTheme('${id}')">
+      <div class="theme-swatches">
+        <div class="theme-swatch" style="background:${t.bg}"></div>
+        <div class="theme-swatch" style="background:${t.surface}"></div>
+        <div class="theme-swatch" style="background:${t.accent}"></div>
+        <div class="theme-swatch" style="background:${t.accent2}"></div>
+      </div>
+      <div><div class="theme-name">${t.name}</div><div class="theme-desc">${t.desc}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSettings() {
+  const overlay=document.getElementById('settings-overlay');
+  const panel=document.getElementById('settings-panel');
+  const open=panel.classList.contains('open');
+  overlay.classList.toggle('open',!open);
+  panel.classList.toggle('open',!open);
+  if(!open){
+    renderThemeGrid();
+    const stEl=document.getElementById('strava-status-text');
+    if(stravaLoaded) stEl.innerHTML='<span style="color:var(--green)">Connected</span> · '+stravaRuns.length+' runs synced';
+    else stEl.textContent='Connecting...';
+  }
+}
+
+// Restore theme on load
+(function(){
+  const saved=localStorage.getItem('stride-theme');
+  if(saved && THEMES[saved]) { currentTheme=saved; setTimeout(()=>applyTheme(saved),0); }
+})();
+
+function switchRange(r) {
+  currentRange=r;
+  document.querySelectorAll('.range-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.textContent.toLowerCase()===r);
+  });
+  renderDashboard();
+  if(currentView==='insights') renderInsights();
+  if(currentView==='health') renderHealth();
+  if(currentView==='strava') renderStrava();
+}
+
+// ═══ RENDERING ═══
+function renderDashboard() {
+  const fw=filterByRange(weights);
+  const fr=filterByRange(runs);
+  const ws=calcStats(fw,'weight');
+  const paces=fr.map(r=>parsePace(r.pace)).filter(Boolean);
+  const miles=fr.map(r=>parseFloat(r.mileage)).filter(Boolean);
+  const totalMi=miles.reduce((a,b)=>a+b,0);
+  const avgP=paces.length?paces.reduce((a,b)=>a+b)/paces.length:null;
+  const bestP=paces.length?Math.min(...paces):null;
+
+  const recent7=fw.slice(-7).map(x=>x.weight);
+  const old7=fw.slice(0,Math.min(7,fw.length)).map(x=>x.weight);
+  const trend=recent7.length&&old7.length?(recent7.reduce((a,b)=>a+b)/recent7.length-old7.reduce((a,b)=>a+b)/old7.length).toFixed(1):0;
+
+  document.getElementById('subtitle').textContent=`Weight & Run Tracker — ${weights.length} weigh-ins · ${runs.length} runs logged`;
+
+  // Stats grid
+  const statsHTML = [
+    {l:'Current',v:ws.last?ws.last+' lb':'—',s:'Last weigh-in'},
+    {l:'Average',v:ws.avg?ws.avg.toFixed(1)+' lb':'—',s:`${ws.count||0} entries`},
+    {l:'Range',v:ws.min?ws.min+'–'+ws.max:'—',s:(ws.max-ws.min).toFixed(1)+' lb spread'},
+    {l:'Trend',v:trend?(trend>0?'+':'')+trend+' lb':'—',s:'Period start vs end',c:trend>0?'var(--orange)':'var(--green)'},
+    {l:'Runs',v:fr.length||'0',s:totalMi?totalMi.toFixed(1)+' mi total':'Log your first run'},
+    {l:'Best Pace',v:fmtPace(bestP),s:avgP?'Avg: '+fmtPace(avgP)+'/mi':'—'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c||'var(--text)'}">${s.v}</div><div class="stat-sub">${s.s}</div></div>`).join('');
+  document.getElementById('stats-grid').innerHTML=statsHTML;
+
+  // Weight chart
+  const labels=fw.map(x=>fmtD(x.date));
+  const vals=fw.map(x=>x.weight);
+  const avg7=movingAvg(fw,'weight',7);
+
+  // Outliers
+  const outlierSet=new Set();
+  if(fw.length>=10){
+    fw.forEach(w=>{if(Math.abs(w.weight-ws.avg)>1.8*ws.std)outlierSet.add(w.date);});
+  }
+  document.getElementById('outlier-legend').textContent=outlierSet.size?`● outliers (${outlierSet.size})`:'';
+
+  const pointColors=fw.map(w=>outlierSet.has(w.date)?'#f77f00':'transparent');
+  const pointRadius=fw.map(w=>outlierSet.has(w.date)?5:0);
+  const pointBorder=fw.map(w=>outlierSet.has(w.date)?'#fff':'transparent');
+
+  if(weightChart) weightChart.destroy();
+  weightChart = new Chart(document.getElementById('weightChart'),{
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'Weight',data:vals,borderColor:'#e63946',backgroundColor:'rgba(230,57,70,0.08)',fill:true,tension:0.3,borderWidth:2,pointBackgroundColor:pointColors,pointRadius,pointBorderColor:pointBorder,pointBorderWidth:2},
+        {label:'7-day avg',data:avg7,borderColor:'#457b9d',borderWidth:2,borderDash:[5,3],tension:0.4,pointRadius:0,fill:false}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#161822',titleColor:'#6b7280',bodyColor:'#e8eaed',borderColor:'rgba(230,57,70,0.2)',borderWidth:1,padding:12,cornerRadius:10,bodyFont:{weight:700,size:14},callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+' lb'}}},
+      scales:{x:{ticks:{color:'#3d4250',font:{size:10},maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{min:Math.floor(ws.min-2),max:Math.ceil(ws.max+2),ticks:{color:'#3d4250',font:{size:11}},grid:{color:'rgba(255,255,255,0.03)'}}}
+    }
+  });
+
+  // Pace chart
+  const paceData=fr.filter(r=>parsePace(r.pace));
+  const paceEl=document.getElementById('pace-card');
+  if(paceData.length>0){
+    paceEl.classList.remove('hidden');
+    if(paceChart) paceChart.destroy();
+    paceChart = new Chart(document.getElementById('paceChart'),{
+      type:'line',
+      data:{labels:paceData.map(r=>fmtD(r.date)),datasets:[{label:'Pace',data:paceData.map(r=>parsePace(r.pace)),borderColor:'#2ec4b6',backgroundColor:'rgba(46,196,182,0.08)',fill:true,tension:0.3,borderWidth:2.5,pointRadius:3,pointBackgroundColor:'#2ec4b6'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#161822',borderColor:'rgba(46,196,182,0.2)',borderWidth:1,padding:12,cornerRadius:10,callbacks:{label:ctx=>fmtPace(ctx.parsed.y)+'/mi'}}},scales:{x:{ticks:{color:'#3d4250',font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'}},y:{reverse:true,ticks:{color:'#3d4250',font:{size:11},callback:v=>fmtPace(v)},grid:{color:'rgba(255,255,255,0.03)'}}}}
+    });
+  } else { paceEl.classList.add('hidden'); }
+
+  // Yearly running stats
+  const thisYear=new Date().getFullYear().toString();
+  const yearRuns=runs.filter(r=>r.date.startsWith(thisYear));
+  const yearPaces=yearRuns.map(r=>parsePace(r.pace)).filter(Boolean);
+  const yearMiles=yearRuns.map(r=>parseFloat(r.mileage)).filter(Boolean);
+  const yearTotalMi=yearMiles.reduce((a,b)=>a+b,0);
+  const yearAvgPace=yearPaces.length?yearPaces.reduce((a,b)=>a+b)/yearPaces.length:null;
+  const yearRunCard=document.getElementById('yearly-run-card');
+  const routeCard=document.getElementById('route-card');
+
+  document.getElementById('run-year-label').textContent=thisYear;
+  document.getElementById('route-year-label').textContent=thisYear;
+
+  if(yearRuns.length>0||runs.length>0){
+    yearRunCard.classList.remove('hidden');
+    const runStatsHTML=[
+      {l:'Runs This Year',v:yearRuns.length,s:yearRuns.length===1?'run logged':'runs logged',c:'var(--green)'},
+      {l:'Total Mileage',v:yearTotalMi?yearTotalMi.toFixed(1)+' mi':'0 mi',s:yearMiles.length?yearMiles.length+' runs with distance':'No distances logged yet',c:'var(--accent2)'},
+      {l:'Avg Pace',v:fmtPace(yearAvgPace),s:yearPaces.length?yearPaces.length+' runs with pace':'No paces logged yet',c:'var(--green)'},
+      {l:'All-Time Runs',v:runs.length,s:(()=>{const am=runs.map(r=>parseFloat(r.mileage)).filter(Boolean);return am.length?am.reduce((a,b)=>a+b,0).toFixed(1)+' mi total':'Total across all years';})(),c:'var(--text)'},
+    ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c||'var(--text)'}">${s.v}</div><div class="stat-sub">${s.s}</div></div>`).join('');
+    document.getElementById('run-stats-grid').innerHTML=runStatsHTML;
+
+    // Last shoe info
+    const lastRun=[...fr].reverse().find(r=>r.shoe);
+    const shoeInfoEl=document.getElementById('last-shoe-info');
+    if(lastRun && lastRun.shoe) {
+      const shoeName=lastRun.shoe;
+      const shoeRuns=runs.filter(r=>r.shoe===shoeName);
+      const shoeMi=shoeRuns.map(r=>parseFloat(r.mileage)).filter(Boolean);
+      const totalShoeMi=shoeMi.length?shoeMi.reduce((a,b)=>a+b,0):0;
+      const shoePaces=shoeRuns.map(r=>parsePace(r.pace)).filter(Boolean);
+      const avgShoePace=shoePaces.length?shoePaces.reduce((a,b)=>a+b)/shoePaces.length:null;
+      const lastRunMi=parseFloat(lastRun.mileage)||0;
+      shoeInfoEl.innerHTML=`<div style="margin-top:14px;padding:12px 16px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase">LAST SHOE</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent)">${shoeName}</span>
+        <span style="color:var(--dim);font-size:12px">·</span>
+        <span style="font-size:12px;color:var(--dim)">last run ${lastRunMi.toFixed(1)} mi</span>
+        <span style="color:var(--dim);font-size:12px">·</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent2)">${totalShoeMi.toFixed(1)} mi total</span>
+        <span style="color:var(--dim);font-size:12px">·</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green)">${fmtPace(avgShoePace)} avg</span>
+        <span style="color:var(--dim);font-size:12px">·</span>
+        <span style="font-size:12px;color:var(--dim)">${shoeRuns.length} runs</span>
+      </div>`;
+    } else { shoeInfoEl.innerHTML=''; }
+  } else {
+    yearRunCard.classList.remove('hidden');
+    document.getElementById('run-stats-grid').innerHTML='<div class="stat-card" style="grid-column:1/-1"><div class="stat-label">NO RUNS YET</div><div class="stat-sub" style="margin-top:6px">Use "Log Run" to start tracking. Your yearly stats and route breakdown will appear here.</div></div>';
+  }
+
+  // Route mileage chart
+  const routeByName={};
+  ROUTES.forEach(r=>{routeByName[r]=0;});
+  yearRuns.forEach(r=>{const mi=parseFloat(r.mileage);if(mi&&routeByName.hasOwnProperty(r.route))routeByName[r.route]+=mi;});
+  const routeEntries=ROUTES.map(r=>({name:r,miles:Math.round(routeByName[r]*10)/10})).filter(r=>r.miles>0);
+
+  if(routeEntries.length>0){
+    routeCard.classList.remove('hidden');
+    const routeColors=['#e63946','#457b9d','#2ec4b6','#f77f00','#a855f7'];
+    if(routeChart) routeChart.destroy();
+    routeChart = new Chart(document.getElementById('routeChart'),{
+      type:'bar',
+      data:{
+        labels:routeEntries.map(r=>r.name),
+        datasets:[{label:'Miles',data:routeEntries.map(r=>r.miles),backgroundColor:routeEntries.map((_,i)=>routeColors[i%routeColors.length]+'99'),borderColor:routeEntries.map((_,i)=>routeColors[i%routeColors.length]),borderWidth:1,borderRadius:6}]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#161822',borderColor:'rgba(69,123,157,0.2)',borderWidth:1,padding:12,cornerRadius:10,callbacks:{label:ctx=>ctx.parsed.x.toFixed(1)+' miles'}}},
+        scales:{x:{ticks:{color:'#3d4250',font:{size:11}},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{color:'#e8eaed',font:{size:13,weight:600}},grid:{display:false}}}
+      }
+    });
+  } else {
+    routeCard.classList.add('hidden');
+    if(routeChart){routeChart.destroy();routeChart=null;}
+  }
+
+  // Monthly chart
+  const months={};
+  fw.forEach(w=>{const k=w.date.slice(0,7);if(!months[k])months[k]={s:0,n:0};months[k].s+=w.weight;months[k].n++;});
+  const mKeys=Object.keys(months).sort();
+  const mVals=mKeys.map(k=>Math.round(months[k].s/months[k].n*10)/10);
+
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'),{
+    type:'bar',
+    data:{labels:mKeys,datasets:[{label:'Avg Weight',data:mVals,backgroundColor:'rgba(69,123,157,0.5)',borderColor:'#457b9d',borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#161822',borderColor:'rgba(69,123,157,0.2)',borderWidth:1,padding:12,cornerRadius:10,callbacks:{label:ctx=>ctx.parsed.y.toFixed(1)+' lb avg'}}},scales:{x:{ticks:{color:'#3d4250',font:{size:9},maxRotation:45},grid:{display:false}},y:{min:Math.floor(Math.min(...mVals)-2),ticks:{color:'#3d4250',font:{size:11}},grid:{color:'rgba(255,255,255,0.03)'}}}}
+  });
+}
+
+function renderInsights() {
+  const fw=filterByRange(weights);
+  const fr=filterByRange(runs);
+  const ws=calcStats(fw,'weight');
+
+  // Weight outliers
+  let wOutHtml='';
+  if(fw.length>=10){
+    const outliers=fw.filter(w=>Math.abs(w.weight-ws.avg)>1.8*ws.std);
+    if(outliers.length){
+      wOutHtml=outliers.map(w=>{
+        const dev=((w.weight-ws.avg)/ws.std).toFixed(1);
+        return`<div class="outlier-item outlier-weight"><span class="outlier-val" style="color:var(--orange)">${w.weight} lb</span><span class="outlier-date">${fmtFull(w.date)}</span><span class="outlier-dev" style="color:var(--orange)">${dev>0?'+':''}${dev}σ from mean</span></div>`;
+      }).join('');
+    } else { wOutHtml='<div class="empty-state">No significant weight outliers in this period. Your weight has been consistent.</div>'; }
+  } else { wOutHtml='<div class="empty-state">Need more data to detect outliers.</div>'; }
+  document.getElementById('weightOutliers').innerHTML=wOutHtml;
+
+  // Pace outliers
+  const pRuns=fr.map(r=>({...r,p:parsePace(r.pace)})).filter(r=>r.p);
+  let pOutHtml='';
+  if(pRuns.length>=5){
+    const pVals=pRuns.map(r=>r.p);
+    const pAvg=pVals.reduce((a,b)=>a+b)/pVals.length;
+    const pStd=Math.sqrt(pVals.reduce((s,x)=>s+(x-pAvg)**2,0)/pVals.length);
+    const fast=pRuns.filter(r=>r.p<pAvg-1.5*pStd);
+    if(fast.length){
+      pOutHtml=fast.map(r=>`<div class="outlier-item outlier-pace"><span class="outlier-val" style="color:var(--green)">${fmtPace(r.p)}/mi</span><span class="outlier-date">${fmtFull(r.date)}</span><span class="outlier-dev" style="color:var(--green)">${((pAvg-r.p)/pStd).toFixed(1)}σ faster than avg</span>${r.route?`<span class="outlier-date">@ ${r.route}</span>`:''}</div>`).join('');
+    } else { pOutHtml='<div class="empty-state">No pace outliers yet — all runs are within normal range.</div>'; }
+  } else { pOutHtml='<div class="empty-state">Log more runs to detect notably fast paces here.</div>'; }
+  document.getElementById('paceOutliers').innerHTML=pOutHtml;
+
+  // Run log
+  const logCard=document.getElementById('runLogCard');
+  if(fr.length){
+    logCard.classList.remove('hidden');
+    const sorted=[...fr].reverse();
+    const rowFn=r=>`<tr><td style="font-weight:600">${fmtD(r.date)}</td><td style="color:var(--accent)">${r.route}</td><td style="font-family:'JetBrains Mono',monospace">${r.pace||'—'}</td><td>${r.mileage||'—'}</td><td style="color:var(--dim);font-size:12px">${r.shoe||'—'}</td><td>${r.avgHR||'—'}</td><td style="color:var(--dim);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes||'—'}</td></tr>`;
+    const previewCount=5;
+    document.getElementById('runLogPreview').innerHTML=sorted.slice(0,previewCount).map(rowFn).join('');
+    document.getElementById('runLogBody').innerHTML=sorted.length>previewCount?sorted.slice(previewCount).map(rowFn).join(''):'';
+  } else { logCard.classList.add('hidden'); }
+
+  // Year-over-year weight
+  document.getElementById('yoyGrid').innerHTML=['2022','2023','2024','2025','2026'].map(yr=>{
+    const yw=weights.filter(w=>w.date.startsWith(yr));
+    if(!yw.length)return'';
+    const avg=(yw.reduce((s,w)=>s+w.weight,0)/yw.length).toFixed(1);
+    const mn=Math.min(...yw.map(w=>w.weight));
+    const mx=Math.max(...yw.map(w=>w.weight));
+    return`<div class="yoy-card"><div class="yoy-year">${yr}</div><div class="yoy-avg">${avg}</div><div class="yoy-sub">avg lb · ${yw.length} entries</div><div class="yoy-sub">${mn}–${mx} range</div></div>`;
+  }).join('');
+
+  // Year-over-year pace
+  document.getElementById('yoyPaceGrid').innerHTML=['2022','2023','2024','2025','2026'].map(yr=>{
+    const yr_runs=runs.filter(r=>r.date.startsWith(yr));
+    const yr_paces=yr_runs.map(r=>parsePace(r.pace)).filter(Boolean);
+    if(!yr_paces.length)return'';
+    const avg=yr_paces.reduce((a,b)=>a+b)/yr_paces.length;
+    const best=Math.min(...yr_paces);
+    const totalMi=yr_runs.map(r=>parseFloat(r.mileage)).filter(Boolean).reduce((a,b)=>a+b,0);
+    return`<div class="yoy-card"><div class="yoy-year">${yr}</div><div class="yoy-avg" style="color:var(--green)">${fmtPace(avg)}</div><div class="yoy-sub">avg pace/mi · ${yr_runs.length} runs</div><div class="yoy-sub">Best: ${fmtPace(best)}/mi · ${totalMi.toFixed(1)} mi</div></div>`;
+  }).join('');
+
+  // Year-over-year mileage
+  document.getElementById('yoyMileGrid').innerHTML=['2022','2023','2024','2025','2026'].map(yr=>{
+    const yr_runs=runs.filter(r=>r.date.startsWith(yr));
+    const yr_miles=yr_runs.map(r=>parseFloat(r.mileage)).filter(Boolean);
+    if(!yr_miles.length)return'';
+    const total=yr_miles.reduce((a,b)=>a+b,0);
+    const avg=total/yr_miles.length;
+    const longest=Math.max(...yr_miles);
+    return`<div class="yoy-card"><div class="yoy-year">${yr}</div><div class="yoy-avg" style="color:var(--accent2)">${total.toFixed(1)}</div><div class="yoy-sub">total miles · ${yr_runs.length} runs</div><div class="yoy-sub">Avg: ${avg.toFixed(1)} mi · Long: ${longest.toFixed(1)} mi</div></div>`;
+  }).join('');
+
+  // Shoe breakdown
+  // Shoe name normalization (merge typos/variants)
+  const shoeNorm={'Vaporfly2':'Vaporfly 2'};
+  const normShoe=s=>(shoeNorm[s]||s);
+
+  const shoeMap={};
+  runs.forEach(r=>{
+    const s=normShoe(r.shoe||'Unknown');
+    if(!shoeMap[s]) shoeMap[s]={runs:0,miles:0,paces:[],miles_arr:[]};
+    shoeMap[s].runs++;
+    const mi=parseFloat(r.mileage);
+    if(mi){shoeMap[s].miles+=mi;shoeMap[s].miles_arr.push(mi);}
+    const p=parsePace(r.pace);
+    if(p) shoeMap[s].paces.push(p);
+  });
+  const shoeEntries=Object.entries(shoeMap).sort((a,b)=>b[1].miles-a[1].miles);
+  document.getElementById('shoeTableBody').innerHTML=shoeEntries.map(([name,d])=>{
+    const avgPace=d.paces.length?d.paces.reduce((a,b)=>a+b)/d.paces.length:null;
+    const bestPace=d.paces.length?Math.min(...d.paces):null;
+    const avgDist=d.miles_arr.length?(d.miles/d.miles_arr.length):0;
+    return`<tr><td style="font-weight:600">${name}</td><td>${d.runs}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--accent2)">${d.miles.toFixed(1)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--green)">${fmtPace(avgPace)}</td><td style="font-family:'JetBrains Mono',monospace">${fmtPace(bestPace)}</td><td>${avgDist.toFixed(1)} mi</td></tr>`;
+  }).join('');
+}
+
+function updateWeightFormHint() {
+  const fw=filterByRange(weights);
+  const last=fw[fw.length-1];
+  document.getElementById('wLast').textContent=last?`Last: ${last.weight} lb on ${fmtFull(last.date)}`:'';
+}
+
+function toggleAddNew(type) {
+  const row = document.getElementById(type==='route'?'addRouteRow':'addShoeRow');
+  row.classList.toggle('hidden');
+  if(!row.classList.contains('hidden')){
+    const input = document.getElementById(type==='route'?'newRouteInput':'newShoeInput');
+    input.value=''; input.focus();
+  }
+}
+
+function confirmAddNew(type) {
+  const input = document.getElementById(type==='route'?'newRouteInput':'newShoeInput');
+  const val = input.value.trim();
+  if(!val) return;
+  const list = type==='route'?ROUTES:SHOES;
+  if(list.some(x=>x.toLowerCase()===val.toLowerCase())){ showToast('⚠ Already exists!'); return; }
+  list.push(val);
+  const selId = type==='route'?'rRoute':'rShoe';
+  const sel = document.getElementById(selId);
+  const o = document.createElement('option'); o.value=val; o.textContent=val; sel.appendChild(o);
+  sel.value=val;
+  saveData();
+  toggleAddNew(type);
+  showToast('✓ '+(type==='route'?'Route':'Shoe')+' added!');
+}
+
+// ═══ FORM HANDLERS ═══
+function addWeight() {
+  const date=document.getElementById('wDate').value;
+  const val=parseFloat(document.getElementById('wVal').value);
+  if(!date||isNaN(val))return;
+  weights.push({date,weight:val});
+  weights.sort((a,b)=>a.date.localeCompare(b.date));
+  saveData(); showToast('✓ Weight logged!');
+  sbSaveWeight(date,val);
+  document.getElementById('wVal').value='';
+  updateWeightFormHint();
+}
+
+function addRun() {
+  const date=document.getElementById('rDate').value;
+  const route=document.getElementById('rRoute').value;
+  if(!date||!route)return;
+  const newRun={
+    date, route,
+    pace:document.getElementById('rPace').value,
+    mileage:document.getElementById('rMiles').value,
+    time:document.getElementById('rTime').value,
+    shoe:document.getElementById('rShoe').value,
+    avgHR:document.getElementById('rHR').value,
+    notes:document.getElementById('rNotes').value
+  };
+  runs.push(newRun);
+  runs.sort((a,b)=>a.date.localeCompare(b.date));
+  saveData(); showToast('✓ Run logged!');
+  sbSaveRun(newRun);
+  ['rPace','rMiles','rTime','rHR','rNotes'].forEach(id=>document.getElementById(id).value='');
+}
+
+// ═══ HEALTH ═══
+function filterOuraByRange(arr) {
+  const now=new Date(), cut=new Date();
+  if(currentRange==='1w') cut.setDate(now.getDate()-7);
+  else if(currentRange==='1m') cut.setMonth(now.getMonth()-1);
+  else if(currentRange==='3m') cut.setMonth(now.getMonth()-3);
+  else if(currentRange==='6m') cut.setMonth(now.getMonth()-6);
+  else if(currentRange==='1y') cut.setFullYear(now.getFullYear()-1);
+  else cut.setFullYear(2000);
+  return arr.filter(x=>new Date(x.d)>=cut);
+}
+
+async function renderHealth() {
+  const loadEl=document.getElementById('health-loading');
+  const contentEl=document.getElementById('health-content');
+  if(!ouraLoaded){loadEl.style.display='block';contentEl.style.opacity='0.3';}
+  await fetchOura();
+  loadEl.style.display='none';contentEl.style.opacity='1';
+  const fd=filterOuraByRange(OURA);
+  if(!fd.length) return;
+
+  const labels=fd.map(x=>fmtD(x.d));
+  const sleepHrs=fd.map(x=>Math.round(x.sl/60*10)/10);
+  const avgHRs=fd.map(x=>x.ah||null);
+  const lowHRs=fd.map(x=>x.lh||null);
+  const temps=fd.map(x=>x.tp!=null?x.tp:null);
+  const resps=fd.map(x=>x.rr||null);
+  const hrvs=fd.map(x=>x.hv||null);
+  const deepMins=fd.map(x=>x.dp||null);
+  const remMins=fd.map(x=>x.rm||null);
+  const lightMins=fd.map(x=>x.lt||null);
+  const awakeMins=fd.map(x=>x.aw||null);
+
+  // HRV 7-day avg
+  const hrvAvg7=hrvs.map((v,i)=>{
+    const start=Math.max(0,i-6);
+    const slice=hrvs.slice(start,i+1).filter(Boolean);
+    return slice.length?Math.round(slice.reduce((a,b)=>a+b)/slice.length):null;
+  });
+
+  // Sleep stages in hours for tooltip
+  const deepHrs=deepMins.map(x=>x!=null?Math.round(x/60*10)/10:null);
+  const remHrs=remMins.map(x=>x!=null?Math.round(x/60*10)/10:null);
+  const lightHrs=lightMins.map(x=>x!=null?Math.round(x/60*10)/10:null);
+  const awakeHrs=awakeMins.map(x=>x!=null?Math.round(x/60*10)/10:null);
+
+  // Sleep 7-day avg
+  const sleepAvg7=sleepHrs.map((v,i)=>{
+    const start=Math.max(0,i-6);
+    const slice=sleepHrs.slice(start,i+1).filter(Boolean);
+    return slice.length?Math.round(slice.reduce((a,b)=>a+b)/slice.length*10)/10:null;
+  });
+
+  // Stats
+  const validSleep=sleepHrs.filter(Boolean);
+  const validAvgHR=avgHRs.filter(Boolean);
+  const validLowHR=lowHRs.filter(Boolean);
+  const validTemp=temps.filter(x=>x!=null);
+  const validResp=resps.filter(Boolean);
+  const validHRV=hrvs.filter(Boolean);
+  const validDeep=deepMins.filter(Boolean);
+  const validREM=remMins.filter(Boolean);
+
+  const avgSleep=validSleep.length?(validSleep.reduce((a,b)=>a+b)/validSleep.length).toFixed(1):'-';
+  const avgAvgHR=validAvgHR.length?Math.round(validAvgHR.reduce((a,b)=>a+b)/validAvgHR.length):'-';
+  const avgLowHR=validLowHR.length?Math.round(validLowHR.reduce((a,b)=>a+b)/validLowHR.length):'-';
+  const avgTemp=validTemp.length?(validTemp.reduce((a,b)=>a+b)/validTemp.length).toFixed(2):'-';
+  const avgResp=validResp.length?(validResp.reduce((a,b)=>a+b)/validResp.length).toFixed(1):'-';
+  const lastSleep=validSleep.length?validSleep[validSleep.length-1]:'-';
+  const avgHRV=validHRV.length?Math.round(validHRV.reduce((a,b)=>a+b)/validHRV.length):'-';
+  const lastHRV=validHRV.length?validHRV[validHRV.length-1]:'-';
+  const avgDeepH=validDeep.length?(validDeep.reduce((a,b)=>a+b)/validDeep.length/60).toFixed(1):'-';
+  const avgREMH=validREM.length?(validREM.reduce((a,b)=>a+b)/validREM.length/60).toFixed(1):'-';
+
+  document.getElementById('health-stats-grid').innerHTML=[
+    {l:'Avg Sleep',v:avgSleep+'h',s:validSleep.length+' nights',c:'var(--accent2)'},
+    {l:'Avg HRV',v:avgHRV+' ms',s:'Last: '+lastHRV+' ms',c:'#10b981'},
+    {l:'Avg Resting HR',v:avgAvgHR+' bpm',s:'Lowest avg: '+avgLowHR+' bpm',c:'var(--accent)'},
+    {l:'Avg Deep Sleep',v:avgDeepH+'h',s:'per night',c:'#6366f1'},
+    {l:'Avg REM Sleep',v:avgREMH+'h',s:'per night',c:'#06b6d4'},
+    {l:'Avg Temp Dev',v:avgTemp+'°C',s:'From baseline',c:'#a855f7'},
+    {l:'Avg Resp Rate',v:avgResp,s:'breaths/min',c:'var(--green)'},
+    {l:'Last Night',v:lastSleep+'h',s:fd.length?fmtD(fd[fd.length-1].d):'—'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c||'var(--text)'}">${s.v}</div><div class="stat-sub">${s.s}</div></div>`).join('');
+
+  const chartOpts=(yLabel)=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#161822',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:12,cornerRadius:10}},scales:{x:{ticks:{color:'#3d4250',font:{size:9},maxTicksLimit:12,maxRotation:45},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{color:'#3d4250',font:{size:11}},grid:{color:'rgba(255,255,255,0.03)'}}}});
+
+  // HRV chart
+  if(hrvChart) hrvChart.destroy();
+  hrvChart=new Chart(document.getElementById('hrvChart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'HRV',data:hrvs,borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.08)',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0},
+      {label:'7-day avg',data:hrvAvg7,borderColor:'#3d4250',borderWidth:2,borderDash:[5,3],tension:0.4,pointRadius:0,fill:false}
+    ]},
+    options:{...chartOpts(),plugins:{...chartOpts().plugins,tooltip:{...chartOpts().plugins.tooltip,callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+' ms'}}}}
+  });
+
+  // Sleep stages stacked bar chart
+  if(stagesChart) stagesChart.destroy();
+  stagesChart=new Chart(document.getElementById('stagesChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Deep',data:deepHrs,backgroundColor:'#6366f1',borderRadius:1},
+      {label:'REM',data:remHrs,backgroundColor:'#06b6d4',borderRadius:1},
+      {label:'Light',data:lightHrs,backgroundColor:'#94a3b8',borderRadius:1},
+      {label:'Awake',data:awakeHrs,backgroundColor:'#ef4444',borderRadius:1}
+    ]},
+    options:{...chartOpts(),plugins:{...chartOpts().plugins,tooltip:{...chartOpts().plugins.tooltip,mode:'index',callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+' hrs',footer:items=>{const t=items.reduce((s,i)=>s+(i.parsed.y||0),0);return'Total: '+t.toFixed(1)+' hrs';}}}},scales:{...chartOpts().scales,x:{...chartOpts().scales.x,stacked:true},y:{...chartOpts().scales.y,stacked:true}}}
+  });
+
+  // Sleep chart
+  if(sleepChart) sleepChart.destroy();
+  sleepChart=new Chart(document.getElementById('sleepChart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Sleep',data:sleepHrs,borderColor:'#457b9d',backgroundColor:'rgba(69,123,157,0.08)',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0},
+      {label:'7-day avg',data:sleepAvg7,borderColor:'#3d4250',borderWidth:2,borderDash:[5,3],tension:0.4,pointRadius:0,fill:false}
+    ]},
+    options:{...chartOpts(),plugins:{...chartOpts().plugins,tooltip:{...chartOpts().plugins.tooltip,callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+' hrs'}}}}
+  });
+
+  // HR chart
+  if(hrChart) hrChart.destroy();
+  hrChart=new Chart(document.getElementById('hrChart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Avg Resting HR',data:avgHRs,borderColor:'#e63946',backgroundColor:'rgba(230,57,70,0.06)',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0},
+      {label:'Lowest Resting HR',data:lowHRs,borderColor:'#f77f00',backgroundColor:'rgba(247,127,0,0.06)',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}
+    ]},
+    options:{...chartOpts(),plugins:{...chartOpts().plugins,tooltip:{...chartOpts().plugins.tooltip,callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y+' bpm'}}}}
+  });
+
+  // Temp chart
+  if(tempChart) tempChart.destroy();
+  tempChart=new Chart(document.getElementById('tempChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'Temp Dev',data:temps,backgroundColor:temps.map(t=>t!=null?(t>=0?'rgba(230,57,70,0.5)':'rgba(69,123,157,0.5)'):'transparent'),borderColor:temps.map(t=>t!=null?(t>=0?'#e63946':'#457b9d'):'transparent'),borderWidth:1,borderRadius:2}]},
+    options:{...chartOpts(),plugins:{...chartOpts().plugins,tooltip:{...chartOpts().plugins.tooltip,callbacks:{label:ctx=>(ctx.parsed.y>=0?'+':'')+ctx.parsed.y.toFixed(2)+'°C'}}}}
+  });
+
+  // Resp chart
+  if(respChart) respChart.destroy();
+  respChart=new Chart(document.getElementById('respChart'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Respiratory Rate',data:resps,borderColor:'#2ec4b6',backgroundColor:'rgba(46,196,182,0.08)',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}]},
+    options:{...chartOpts(),plugins:{...chartOpts().plugins,tooltip:{...chartOpts().plugins.tooltip,callbacks:{label:ctx=>ctx.parsed.y.toFixed(1)+' breaths/min'}}}}
+  });
+}
+
+// ═══ INIT ═══
+// ═══ STRAVA TAB ═══
+let stravaPaceChart, stravaWeeklyChart, stravaHRChart, stravaSufferChart, stravaSpeedChart, stravaZonesChart;
+let stravaMap=null;
+
+async function renderStrava(){
+  const loadEl=document.getElementById('strava-loading');
+  const contentEl=document.getElementById('strava-content');
+  if(!stravaLoaded){loadEl.style.display='block';contentEl.style.opacity='0.3';}
+  await fetchStravaActivities();
+  loadEl.style.display='none';contentEl.style.opacity='1';
+
+  const sr=[...stravaRuns].sort((a,b)=>a.date.localeCompare(b.date));
+  const filtered=filterByRange(sr);
+  if(!filtered.length){
+    document.getElementById('strava-stats-grid').innerHTML='<div class="stat-card" style="grid-column:1/-1"><div class="stat-label">NO STRAVA DATA</div><div class="stat-sub" style="margin-top:6px">Could not load Strava activities. Check your connection in Settings.</div></div>';
+    return;
+  }
+
+  // Stats
+  const totalMi=filtered.reduce((s,r)=>s+parseFloat(r.mileage||0),0);
+  const paces=filtered.map(r=>parsePace(r.pace)).filter(Boolean);
+  const avgPace=paces.length?paces.reduce((a,b)=>a+b)/paces.length:null;
+  const hrs=filtered.map(r=>parseInt(r.avgHR)).filter(Boolean);
+  const avgHR=hrs.length?Math.round(hrs.reduce((a,b)=>a+b)/hrs.length):null;
+  const fastest=paces.length?Math.min(...paces):null;
+  const longest=Math.max(...filtered.map(r=>parseFloat(r.mileage||0)));
+  const thisWeek=filtered.filter(r=>{const d=new Date(r.date);const now=new Date();const diff=(now-d)/(1000*60*60*24);return diff<=7;});
+  const weekMi=thisWeek.reduce((s,r)=>s+parseFloat(r.mileage||0),0);
+  const suffers=filtered.map(r=>r.sufferScore).filter(Boolean);
+  const avgSuffer=suffers.length?Math.round(suffers.reduce((a,b)=>a+b)/suffers.length):0;
+
+  document.getElementById('strava-stats-grid').innerHTML=[
+    {l:'Strava Runs',v:filtered.length,s:sr.length+' total synced',c:'#fc4c02'},
+    {l:'Total Miles',v:totalMi.toFixed(1)+' mi',s:'in selected range',c:'var(--accent2)'},
+    {l:'Avg Pace',v:fmtPace(avgPace),s:paces.length+' runs with pace',c:'var(--green)'},
+    {l:'Avg HR',v:avgHR?avgHR+' bpm':'—',s:hrs.length+' runs with HR',c:'#ef4444'},
+    {l:'Fastest Pace',v:fmtPace(fastest),s:'best effort',c:'#fc4c02'},
+    {l:'Longest Run',v:longest.toFixed(1)+' mi',s:'single activity',c:'var(--accent2)'},
+    {l:'This Week',v:weekMi.toFixed(1)+' mi',s:thisWeek.length+' runs',c:'var(--green)'},
+    {l:'Avg Effort',v:avgSuffer||'—',s:'suffer score',c:'#ff6b6b'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c}">${s.v}</div><div class="stat-sub">${s.s}</div></div>`).join('');
+
+  // Pace trend chart
+  const paceData=filtered.filter(r=>parsePace(r.pace)).map(r=>({x:r.date,y:parsePace(r.pace)}));
+  const paceGapped=paceData;
+  const paceMA=paceData.map((p,i)=>{const start=Math.max(0,i-6);const sl=paceData.slice(start,i+1);return{x:p.x,y:sl.reduce((s,v)=>s+v.y,0)/sl.length};});
+  if(stravaPaceChart)stravaPaceChart.destroy();
+  stravaPaceChart=new Chart(document.getElementById('stravaPaceChart'),{type:'line',data:{datasets:[
+    {data:paceData,borderColor:'#fc4c02',backgroundColor:'rgba(252,76,2,0.1)',borderWidth:1.5,pointRadius:2,fill:true,tension:0.3},
+    {data:paceMA,borderColor:'rgba(255,255,255,0.2)',borderWidth:2,pointRadius:0,borderDash:[4,4],tension:0.4}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{type:'time',time:{unit:'month'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10}}},y:{reverse:true,grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10},callback:v=>{const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+(s<10?'0':'')+s;}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const v=ctx.parsed.y;const m=Math.floor(v);const s=Math.round((v-m)*60);return m+':'+(s<10?'0':'')+s+' /mi';}}}}}});
+
+  // Weekly mileage chart
+  const weekMap={};
+  filtered.forEach(r=>{const d=new Date(r.date);const mon=d.getDate()-d.getDay();const wk=new Date(d.getFullYear(),d.getMonth(),mon);const key=wk.toISOString().slice(0,10);weekMap[key]=(weekMap[key]||0)+parseFloat(r.mileage||0);});
+  const weekData=Object.entries(weekMap).sort().map(([k,v])=>({x:k,y:Math.round(v*10)/10}));
+  if(stravaWeeklyChart)stravaWeeklyChart.destroy();
+  stravaWeeklyChart=new Chart(document.getElementById('stravaWeeklyChart'),{type:'bar',data:{datasets:[
+    {data:weekData,backgroundColor:'rgba(252,76,2,0.6)',borderColor:'#fc4c02',borderWidth:1,borderRadius:4}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{type:'time',time:{unit:'week'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10},callback:v=>v+' mi'}}},plugins:{legend:{display:false}}}});
+
+  // HR chart with max HR
+  const hrData=filtered.filter(r=>parseInt(r.avgHR)).map(r=>({x:r.date,y:parseInt(r.avgHR)}));
+  const maxHRData=filtered.filter(r=>r.maxHR).map(r=>({x:r.date,y:r.maxHR}));
+  const hrMA=hrData.map((p,i)=>{const start=Math.max(0,i-6);const sl=hrData.slice(start,i+1);return{x:p.x,y:Math.round(sl.reduce((s,v)=>s+v.y,0)/sl.length)};});
+  if(stravaHRChart)stravaHRChart.destroy();
+  stravaHRChart=new Chart(document.getElementById('stravaHRChart'),{type:'line',data:{datasets:[
+    {data:hrData,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,0.1)',borderWidth:1.5,pointRadius:2,fill:true,tension:0.3,label:'Avg HR'},
+    {data:maxHRData,borderColor:'#ff6b6b',borderWidth:1,pointRadius:1.5,tension:0.3,borderDash:[3,3],label:'Max HR'},
+    {data:hrMA,borderColor:'rgba(255,255,255,0.2)',borderWidth:2,pointRadius:0,borderDash:[4,4],tension:0.4,label:'7-run avg'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{type:'time',time:{unit:'month'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10},callback:v=>v+' bpm'}}},plugins:{legend:{display:false}}}});
+
+  // Suffer score chart
+  const sufferData=filtered.filter(r=>r.sufferScore).map(r=>({x:r.date,y:r.sufferScore}));
+  const sufferMA=sufferData.map((p,i)=>{const start=Math.max(0,i-6);const sl=sufferData.slice(start,i+1);return{x:p.x,y:Math.round(sl.reduce((s,v)=>s+v.y,0)/sl.length)};});
+  if(stravaSufferChart)stravaSufferChart.destroy();
+  stravaSufferChart=new Chart(document.getElementById('stravaSufferChart'),{type:'bar',data:{datasets:[
+    {data:sufferData,backgroundColor:sufferData.map(d=>d.y>100?'rgba(239,68,68,0.7)':d.y>50?'rgba(252,76,2,0.7)':'rgba(252,76,2,0.4)'),borderRadius:4,barPercentage:0.8},
+    {data:sufferMA,borderColor:'rgba(255,255,255,0.3)',borderWidth:2,pointRadius:0,borderDash:[4,4],tension:0.4,type:'line'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{type:'time',time:{unit:'month'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y+' effort'}}}}});
+
+  // Speed chart
+  const spdData=filtered.filter(r=>r.avgSpeed).map(r=>({x:r.date,y:Math.round(r.avgSpeed*2.237*10)/10}));
+  const maxSpdData=filtered.filter(r=>r.maxSpeed).map(r=>({x:r.date,y:Math.round(r.maxSpeed*2.237*10)/10}));
+  if(stravaSpeedChart)stravaSpeedChart.destroy();
+  stravaSpeedChart=new Chart(document.getElementById('stravaSpeedChart'),{type:'line',data:{datasets:[
+    {data:spdData,borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,0.1)',borderWidth:1.5,pointRadius:2,fill:true,tension:0.3,label:'Avg'},
+    {data:maxSpdData,borderColor:'#22d3ee',borderWidth:1,pointRadius:1.5,tension:0.3,borderDash:[3,3],label:'Max'}
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{type:'time',time:{unit:'month'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10},callback:v=>v+' mph'}}},plugins:{legend:{display:false}}}});
+
+  // Run selector buttons for zones and map
+  const recent=filtered.slice(-8).reverse();
+  const btnStyle='padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--dim);font-size:11px;cursor:pointer;font-family:"JetBrains Mono",monospace';
+  const btns=recent.map(r=>`<button style="${btnStyle}" onclick="loadStravaZones('${r.stravaId}',this)" data-id="${r.stravaId}">${fmtD(r.date)} · ${r.mileage} mi</button>`).join('');
+  document.getElementById('strava-zones-select').innerHTML=btns;
+  const mapBtns=recent.filter(r=>r.polyline).map(r=>`<button style="${btnStyle}" onclick="loadStravaMap('${r.stravaId}',this)" data-id="${r.stravaId}">${fmtD(r.date)} · ${r.mileage} mi</button>`).join('');
+  document.getElementById('strava-map-select').innerHTML=mapBtns||'<span style="color:var(--dim2);font-size:12px">No GPS data available</span>';
+
+  // Auto-load most recent run for zones and map
+  const mapRecent=recent.filter(r=>r.polyline);
+  if(recent.length){const zBtn=document.querySelector('#strava-zones-select button');if(zBtn) loadStravaZones(recent[0].stravaId,zBtn);}
+  if(mapRecent.length){const mBtn=document.querySelector('#strava-map-select button');if(mBtn) loadStravaMap(mapRecent[0].stravaId,mBtn);}
+
+  // Activity log
+  document.getElementById('stravaLogBody').innerHTML=[...filtered].reverse().map(r=>{
+    const elev=r.elevation?Math.round(r.elevation)+' ft':'—';
+    const spd=r.avgSpeed?Math.round(r.avgSpeed*2.237*10)/10+' mph':'—';
+    return `<tr><td style="font-weight:600">${fmtD(r.date)}</td><td style="color:#fc4c02">${r.route}</td><td style="font-family:'JetBrains Mono',monospace">${r.pace||'—'}</td><td>${r.mileage||'—'}</td><td style="color:var(--dim)">${r.time||'—'}</td><td>${r.avgHR||'—'}</td><td style="color:var(--dim)">${elev}</td></tr>`;
+  }).join('');
+}
+
+// Load HR zones for a specific activity
+async function loadStravaZones(actId,btn){
+  document.querySelectorAll('#strava-zones-select button').forEach(b=>b.style.borderColor='var(--border)');
+  btn.style.borderColor='#fc4c02';
+  document.getElementById('strava-zones-loading').style.display='block';
+  try{
+    await refreshStravaToken();
+    const r=await fetch(STRAVA_PROXY+'?action=zones&id='+actId+'&token='+STRAVA_ACCESS);
+    const data=await r.json();
+    document.getElementById('strava-zones-loading').style.display='none';
+    const hrZones=data.find(z=>z.type==='heartrate');
+    if(!hrZones||!hrZones.distribution_buckets){document.getElementById('strava-zones-loading').style.display='none';return;}
+    const buckets=hrZones.distribution_buckets;
+    const labels=buckets.map((_,i)=>'Zone '+(i+1));
+    const times=buckets.map(b=>Math.round(b.time/60));
+    const colors=['#22c55e','#84cc16','#eab308','#f97316','#ef4444'];
+    if(stravaZonesChart)stravaZonesChart.destroy();
+    stravaZonesChart=new Chart(document.getElementById('stravaZonesChart'),{type:'bar',data:{labels:labels,datasets:[
+      {data:times,backgroundColor:colors.slice(0,buckets.length),borderRadius:6,barPercentage:0.7}
+    ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#6b7280',font:{size:10},callback:v=>v+'m'}},y:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:11,weight:600}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const b=buckets[ctx.dataIndex];return ctx.parsed.x+'min ('+b.min+'-'+(b.max||'∞')+' bpm)';}}}}}}); 
+  }catch(e){console.warn('Zones error:',e);document.getElementById('strava-zones-loading').style.display='none';}
+}
+
+// Load GPS map for a specific activity
+async function loadStravaMap(actId,btn){
+  document.querySelectorAll('#strava-map-select button').forEach(b=>b.style.borderColor='var(--border)');
+  btn.style.borderColor='#fc4c02';
+  const run=stravaRuns.find(r=>String(r.stravaId)===String(actId));
+  let pl=run?.polyline||'';
+  if(!pl){
+    try{
+      await refreshStravaToken();
+      const r=await fetch(STRAVA_PROXY+'?action=activity&id='+actId+'&token='+STRAVA_ACCESS);
+      const data=await r.json();
+      pl=data.map?.summary_polyline||data.map?.polyline||'';
+    }catch(e){console.warn('Map fetch error:',e);return;}
+  }
+  if(!pl){document.getElementById('strava-map').innerHTML='<div style="text-align:center;padding:40px;color:var(--dim2)">No GPS data for this run</div>';return;}
+  try{
+    const decoded=polyline.decode(pl);
+    if(stravaMap){stravaMap.remove();stravaMap=null;}
+    stravaMap=L.map('strava-map',{zoomControl:true,attributionControl:false}).setView(decoded[0],13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(stravaMap);
+    const line=L.polyline(decoded,{color:'#fc4c02',weight:3,opacity:0.9}).addTo(stravaMap);
+    stravaMap.fitBounds(line.getBounds(),{padding:[30,30]});
+    L.circleMarker(decoded[0],{radius:6,fillColor:'#22c55e',fillOpacity:1,color:'#fff',weight:2}).addTo(stravaMap).bindTooltip('Start');
+    L.circleMarker(decoded[decoded.length-1],{radius:6,fillColor:'#ef4444',fillOpacity:1,color:'#fff',weight:2}).addTo(stravaMap).bindTooltip('Finish');
+  }catch(e){console.warn('Map render error:',e);document.getElementById('strava-map').innerHTML='<div style="text-align:center;padding:40px;color:var(--dim2)">Could not render map</div>';}
+}
+
+async function init() {
+  loadData();
+  // Populate selects
+  const rSel=document.getElementById('rRoute');
+  ROUTES.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=r;rSel.appendChild(o);});
+  const sSel=document.getElementById('rShoe');
+  SHOES.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sSel.appendChild(o);});
+
+  document.getElementById('wDate').value=toISO(new Date());
+  document.getElementById('rDate').value=toISO(new Date());
+
+  // Enter key for add-new inputs
+  document.getElementById('newRouteInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();confirmAddNew('route');}});
+  document.getElementById('newShoeInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();confirmAddNew('shoe');}});
+
+  renderDashboard();
+
+  // Load from Supabase in background
+  try{
+    const sbW=await sbLoadWeights();
+    const sbR=await sbLoadRuns();
+    if(sbW && sbW.length>0){
+      weights=sbW;
+      syncStatus.weights=sbW.length;
+      console.log('Loaded '+sbW.length+' weights from Supabase');
+    }else if(weights.length>0){
+      // Seed Supabase from localStorage fallback
+      await sbSeedWeights(weights.map(w=>({d:w.date,w:w.weight})));
+      syncStatus.weights=weights.length;
+      console.log('Seeded weights to Supabase from local');
+    }
+    if(sbR && sbR.length>0){
+      // Separate manual runs and strava runs
+      const manualRuns=sbR.filter(r=>r.source!=='strava');
+      const stravaFromDb=sbR.filter(r=>r.source==='strava');
+      if(manualRuns.length>0) runs=manualRuns;
+      if(stravaFromDb.length>0){stravaRuns=stravaFromDb;stravaLoaded=true;}
+      syncStatus.runs=manualRuns.length;
+      syncStatus.strava=stravaFromDb.length;
+      console.log('Loaded '+manualRuns.length+' manual runs + '+stravaFromDb.length+' strava runs from Supabase');
+    }else if(runs.length>0){
+      // Seed manual runs from localStorage fallback
+      await sbSeedRuns(runs);
+      syncStatus.runs=runs.length;
+      console.log('Seeded runs to Supabase from local');
+    }
+    syncStatus.ok=true;
+    lastSyncTime=new Date();
+    updateSyncUI();
+    saveData();
+    renderDashboard();
+    if(currentView==='insights') renderInsights();
+    if(currentView==='health') renderHealth();
+    if(currentView==='strava') renderStrava();
+    document.querySelector('.subtitle').textContent='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs logged · ☁️ Synced';
+  }catch(e){console.warn('Supabase init failed, using local data:',e);syncStatus.ok=false;updateSyncUI();}
+
+  // Fetch Strava data in background (gets new runs not yet in DB)
+  fetchStravaActivities().then(()=>{
+    if(stravaRuns.length){
+      // Only save Strava runs that aren't already in Supabase (check by stravaId)
+      const existingIds=new Set((runs.concat(stravaRuns)).filter(r=>r.stravaId).map(r=>String(r.stravaId)));
+      const newStravaRuns=stravaRuns.filter(r=>r.stravaId && !existingIds.has(String(r.stravaId)));
+      if(newStravaRuns.length) sbSaveStravaRuns(newStravaRuns);
+      renderDashboard();
+      if(currentView==='insights') renderInsights();
+    }
+  });
+}
+
+// Chart.js defaults
+Chart.defaults.font.family="'Outfit',sans-serif";
+
+init();
+</script>
+</body>
+</html>
