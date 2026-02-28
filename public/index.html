@@ -169,6 +169,7 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 }
 .form-input:focus { border-color:var(--accent); }
 .form-input-lg { font-size:28px; font-family:'JetBrains Mono',monospace; font-weight:700; text-align:center; padding:18px; }
+.form-input-lg::placeholder { font-size:16px; font-weight:400; color:var(--dim2); font-family:'Outfit',sans-serif; }
 select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
 select.form-input option { background:#111827; }
 .form-submit {
@@ -414,7 +415,7 @@ select.form-input option { background:#111827; }
       <div class="card">
         <div class="form-grid">
           <div class="form-group"><label>Date</label><input type="date" id="wDate" class="form-input"></div>
-          <div class="form-group"><label>Weight (lbs)</label><input type="number" step="0.5" placeholder="193" id="wVal" class="form-input form-input-lg"></div>
+          <div class="form-group"><label>Weight (lbs)</label><input type="number" step="0.1" placeholder="—" id="wVal" class="form-input form-input-lg"></div>
           <button class="form-submit" onclick="addWeight()">Save Weigh-In</button>
           <div class="empty-state" id="wLast"></div>
         </div>
@@ -822,11 +823,12 @@ async function fetchOura(){
   const hdr={Authorization:'Bearer '+OURA_TOKEN};
   const end=new Date().toISOString().slice(0,10);
   const start='2024-01-01';
+  const proxy='https://stride-proxy.vercel.app/api/oura';
   try{
     const [slRes,hrRes,tmpRes]=await Promise.all([
-      fetch('https://api.ouraring.com/v2/usercollection/daily_sleep?start_date='+start+'&end_date='+end,{headers:hdr}),
-      fetch('https://api.ouraring.com/v2/usercollection/daily_cardiovascular_age?start_date='+start+'&end_date='+end,{headers:hdr}).catch(()=>null),
-      fetch('https://api.ouraring.com/v2/usercollection/sleep?start_date='+start+'&end_date='+end,{headers:hdr})
+      fetch(proxy+'?endpoint=daily_sleep&start_date='+start+'&end_date='+end+'&token='+OURA_TOKEN),
+      fetch(proxy+'?endpoint=daily_cardiovascular_age&start_date='+start+'&end_date='+end+'&token='+OURA_TOKEN).catch(()=>null),
+      fetch(proxy+'?endpoint=sleep&start_date='+start+'&end_date='+end+'&token='+OURA_TOKEN)
     ]);
     const sleepDaily=slRes.ok?await slRes.json():{data:[]};
     const sleepPeriods=tmpRes.ok?await tmpRes.json():{data:[]};
@@ -868,7 +870,7 @@ async function fetchOura(){
   }catch(e){console.warn('Oura API error, trying v2 sleep endpoint directly',e);}
   // Fallback: try /v2/usercollection/sleep directly for all data
   try{
-    const r=await fetch('https://api.ouraring.com/v2/usercollection/sleep?start_date='+start+'&end_date='+end,{headers:hdr});
+    const r=await fetch(proxy+'?endpoint=sleep&start_date='+start+'&end_date='+end+'&token='+OURA_TOKEN);
     if(!r.ok) throw new Error(r.status);
     const data=await r.json();
     const byDay={};
@@ -1387,9 +1389,8 @@ function renderInsights() {
 }
 
 function updateWeightFormHint() {
-  const fw=filterByRange(weights);
-  const last=fw[fw.length-1];
-  document.getElementById('wLast').textContent=last?`Last: ${last.weight} lb on ${fmtFull(last.date)}`:'';
+  const last=weights[weights.length-1];
+  document.getElementById('wLast').textContent=last?`Last logged: ${last.weight} lbs on ${fmtFull(last.date)}`:'No weigh-ins yet';
 }
 
 function toggleAddNew(type) {
