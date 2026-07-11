@@ -345,11 +345,12 @@ select.form-input option { background:#111827; }
       <button class="nav-btn" onclick="switchView('ai')" style="color:#a78bfa">✦ AI</button>
     </div>
     <div class="nav nav-range" id="nav-range">
-      <button class="range-btn" onclick="switchRange('1w')">1W</button>
+      <button class="range-btn active" onclick="switchRange('1w')">1W</button>
       <button class="range-btn" onclick="switchRange('1m')">1M</button>
       <button class="range-btn" onclick="switchRange('3m')">3M</button>
       <button class="range-btn" onclick="switchRange('6m')">6M</button>
-      <button class="range-btn active" onclick="switchRange('1y')">1Y</button>
+      <button class="range-btn" onclick="switchRange('ytd')">YTD</button>
+      <button class="range-btn" onclick="switchRange('1y')">1Y</button>
       <button class="range-btn" onclick="switchRange('all')">ALL</button>
     </div>
   </div>
@@ -500,7 +501,7 @@ select.form-input option { background:#111827; }
     </div>
     <div class="card collapsible" id="runLogCard">
       <div class="card-title collapsible-toggle" onclick="toggleCollapse(this)"><span class="collapse-arrow">▸</span> 📋 RUN LOG</div>
-      <div style="overflow-x:auto"><table class="run-table"><thead><tr><th>Date</th><th>Route</th><th>Pace</th><th>Miles</th><th>Shoe</th><th>HR</th><th>Notes</th></tr></thead><tbody id="runLogPreview"></tbody></table></div>
+      <div style="overflow-x:auto"><table class="run-table"><thead><tr><th>Date</th><th>Route</th><th>Pace</th><th>Miles</th><th>Shoe</th><th>HR</th><th>Notes</th><th></th></tr></thead><tbody id="runLogPreview"></tbody></table></div>
       <div class="collapsible-body collapsed"><div style="overflow-x:auto"><table class="run-table"><tbody id="runLogBody"></tbody></table></div></div>
     </div>
     </div>
@@ -641,6 +642,7 @@ async function sbFetch(table,method,body,query=''){
   if(method==='GET') opts.headers['Prefer']='';
   if(body) opts.body=JSON.stringify(body);
   if(method==='POST') opts.headers['Prefer']='return=minimal,resolution=merge-duplicates';
+  if(method==='DELETE') opts.headers['Prefer']='return=minimal';
   const r=await fetch(url,opts);
   if(method==='GET') return r.json();
   return r;
@@ -684,6 +686,51 @@ async function sbSaveRun(run){
     await sbFetch('runs','POST',row);
     lastSyncTime=new Date();syncStatus.runs++;syncStatus.ok=true;updateSyncUI();
   }catch(e){console.warn('Supabase run save failed:',e);}
+}
+
+async function sbDeleteRun(date,route,pace){
+  try{
+    let q='?date=eq.'+date+'&route=eq.'+encodeURIComponent(route);
+    if(pace&&pace!=='—') q+='&pace=eq.'+encodeURIComponent(pace);
+    else q+='&pace=is.null';
+    await sbFetch('runs','DELETE',null,q);
+  }catch(e){console.warn('Supabase run delete failed:',e);}
+}
+
+async function sbDeleteWeight(date,weight){
+  try{
+    await sbFetch('weights','DELETE',null,'?date=eq.'+date+'&weight=eq.'+weight);
+  }catch(e){console.warn('Supabase weight delete failed:',e);}
+}
+
+function deleteRun(idx){
+  const fr=filterByRange(runs);
+  const sorted=[...fr].reverse();
+  const run=sorted[idx];
+  if(!run) return;
+  if(!confirm('Delete run on '+fmtFull(run.date)+' ('+run.route+')?')) return;
+  const ri=runs.indexOf(run);
+  if(ri>-1) runs.splice(ri,1);
+  saveData();
+  sbDeleteRun(run.date,run.route,run.pace);
+  showToast('🗑 Run deleted');
+  renderInsights();
+}
+
+function deleteWeight(idx){
+  const fw=filterByRange(weights);
+  const sorted=[...fw].reverse();
+  const w=sorted[idx];
+  if(!w) return;
+  if(!confirm('Delete weigh-in on '+fmtFull(w.date)+' ('+w.weight+' lbs)?')) return;
+  const wi=weights.indexOf(w);
+  if(wi>-1) weights.splice(wi,1);
+  saveData();
+  sbDeleteWeight(w.date,w.weight);
+  showToast('🗑 Weigh-in deleted');
+  if(currentView==='insights') renderInsights();
+  if(currentView==='dashboard') renderDashboard();
+  updateWeightFormHint();
 }
 
 async function sbSeedWeights(wArr){
@@ -911,7 +958,7 @@ const R0=[];
 let weights = W0.map(x=>({date:x.d, weight:x.w}));
 let runs = R0.map(x=>({date:x.d, route:x.r, pace:x.p, mileage:x.m, time:x.t||'', shoe:x.s||'', avgHR:x.h||'', notes:x.n||''}));
 let currentView = 'dashboard';
-let currentRange = '1y';
+let currentRange = '1w';
 let weightChart, paceChart, monthlyChart, routeChart;
 let sleepChart, hrChart, tempChart, respChart, hrvChart, stagesChart;
 
@@ -946,6 +993,7 @@ function filterByRange(arr) {
   else if(currentRange==='3m') cut.setMonth(now.getMonth()-3);
   else if(currentRange==='6m') cut.setMonth(now.getMonth()-6);
   else if(currentRange==='1y') cut.setFullYear(now.getFullYear()-1);
+  else if(currentRange==='ytd'){ cut.setFullYear(now.getFullYear(),0,1); cut.setHours(0,0,0,0); }
   else cut.setFullYear(2000);
   return arr.filter(x=>new Date(x.date)>=cut).sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -1326,10 +1374,10 @@ function renderInsights() {
   if(fr.length){
     logCard.classList.remove('hidden');
     const sorted=[...fr].reverse();
-    const rowFn=r=>`<tr><td style="font-weight:600">${fmtD(r.date)}</td><td style="color:var(--accent)">${r.route}</td><td style="font-family:'JetBrains Mono',monospace">${r.pace||'—'}</td><td>${r.mileage||'—'}</td><td style="color:var(--dim);font-size:12px">${r.shoe||'—'}</td><td>${r.avgHR||'—'}</td><td style="color:var(--dim);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes||'—'}</td></tr>`;
+    const rowFn=(r,i)=>`<tr><td style="font-weight:600">${fmtD(r.date)}</td><td style="color:var(--accent)">${r.route}</td><td style="font-family:'JetBrains Mono',monospace">${r.pace||'—'}</td><td>${r.mileage||'—'}</td><td style="color:var(--dim);font-size:12px">${r.shoe||'—'}</td><td>${r.avgHR||'—'}</td><td style="color:var(--dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes||'—'}</td><td><button onclick="deleteRun(${i})" style="background:none;border:none;color:var(--dim2);cursor:pointer;font-size:14px;padding:4px 8px;border-radius:6px;transition:color 0.2s" onmouseover="this.style.color='#e74c3c'" onmouseout="this.style.color='var(--dim2)'" title="Delete run">✕</button></td></tr>`;
     const previewCount=5;
-    document.getElementById('runLogPreview').innerHTML=sorted.slice(0,previewCount).map(rowFn).join('');
-    document.getElementById('runLogBody').innerHTML=sorted.length>previewCount?sorted.slice(previewCount).map(rowFn).join(''):'';
+    document.getElementById('runLogPreview').innerHTML=sorted.slice(0,previewCount).map((r,i)=>rowFn(r,i)).join('');
+    document.getElementById('runLogBody').innerHTML=sorted.length>previewCount?sorted.slice(previewCount).map((r,i)=>rowFn(r,i+previewCount)).join(''):'';
   } else { logCard.classList.add('hidden'); }
 
   // Year-over-year weight
@@ -1459,6 +1507,7 @@ function filterOuraByRange(arr) {
   else if(currentRange==='3m') cut.setMonth(now.getMonth()-3);
   else if(currentRange==='6m') cut.setMonth(now.getMonth()-6);
   else if(currentRange==='1y') cut.setFullYear(now.getFullYear()-1);
+  else if(currentRange==='ytd'){ cut.setFullYear(now.getFullYear(),0,1); cut.setHours(0,0,0,0); }
   else cut.setFullYear(2000);
   return arr.filter(x=>new Date(x.d)>=cut);
 }
