@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>STRIDE — Weight & Run Tracker</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<meta name="theme-color" id="meta-theme" content="#07080f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="STRIDE">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,6 +20,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root {
+  --shadow: 0 1px 2px rgba(0,0,0,0.35);
   --bg: #07080f;
   --surface: #0f1119;
   --surface2: #161822;
@@ -58,16 +67,16 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 .nav-btn {
   padding:7px 18px; border-radius:24px; border:none; cursor:pointer;
   font-size:13px; font-weight:600; font-family:'Outfit',sans-serif;
-  background:rgba(255,255,255,0.04); color:var(--dim);
+  background:var(--surface2); color:var(--dim);
   transition: all 0.25s ease;
 }
-.nav-btn:hover { background:rgba(255,255,255,0.08); color:var(--text); }
+.nav-btn:hover { background:color-mix(in srgb,var(--text) 11%,transparent); color:var(--text); }
 .nav-btn.active { background:var(--accent); color:#fff; box-shadow:0 4px 16px var(--accent-glow); }
 .nav-spacer { flex:1; }
 .range-btn {
   padding:5px 12px; border-radius:16px; border:none; cursor:pointer;
   font-size:11px; font-weight:700; font-family:'JetBrains Mono',monospace;
-  background:rgba(255,255,255,0.03); color:var(--dim2);
+  background:var(--surface2); color:var(--dim2);
   letter-spacing:1px; transition: all 0.2s;
 }
 .range-btn:hover { color:var(--dim); }
@@ -78,11 +87,11 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 /* Gear / Settings */
 .gear-btn {
   width:36px; height:36px; border-radius:10px; border:1px solid var(--border);
-  background:rgba(255,255,255,0.04); color:var(--dim); font-size:18px;
+  background:var(--surface2); color:var(--dim); font-size:18px;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
   transition: all 0.25s;
 }
-.gear-btn:hover { background:rgba(255,255,255,0.08); color:var(--text); border-color:rgba(255,255,255,0.12); }
+.gear-btn:hover { background:color-mix(in srgb,var(--text) 11%,transparent); color:var(--text); border-color:color-mix(in srgb,var(--text) 15%,transparent); }
 .settings-overlay {
   display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200;
   backdrop-filter:blur(4px);
@@ -99,20 +108,20 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 .settings-title { font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; letter-spacing:1px; }
 .settings-close {
   width:32px; height:32px; border-radius:8px; border:1px solid var(--border);
-  background:rgba(255,255,255,0.04); color:var(--dim); font-size:14px;
+  background:var(--surface2); color:var(--dim); font-size:14px;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
   transition:all 0.2s;
 }
-.settings-close:hover { background:rgba(255,255,255,0.08); color:var(--text); }
+.settings-close:hover { background:color-mix(in srgb,var(--text) 11%,transparent); color:var(--text); }
 .settings-section { margin-bottom:28px; }
 .settings-label { font-size:10px; font-weight:700; color:var(--dim); letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
 .theme-grid { display:flex; flex-direction:column; gap:10px; }
 .theme-option {
   display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:12px;
   border:2px solid var(--border); cursor:pointer; transition:all 0.2s;
-  background:rgba(255,255,255,0.02);
+  background:var(--surface2);
 }
-.theme-option:hover { border-color:rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); }
+.theme-option:hover { border-color:color-mix(in srgb,var(--text) 15%,transparent); background:var(--surface2); }
 .theme-option.active { border-color:var(--accent2); background:rgba(69,123,157,0.08); }
 .theme-swatches { display:flex; gap:5px; }
 .theme-swatch { width:22px; height:22px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); }
@@ -122,9 +131,10 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 .card {
   background:var(--surface); border-radius:16px; padding:22px 26px;
   border:1px solid var(--border); margin-bottom:20px;
+  box-shadow:var(--shadow);
   transition: border-color 0.3s;
 }
-.card:hover { border-color: rgba(255,255,255,0.1); }
+.card:hover { border-color:color-mix(in srgb,var(--text) 13%,transparent); }
 .card-title {
   font-size:11px; font-weight:700; color:var(--dim); letter-spacing:2px;
   text-transform:uppercase; margin-bottom:16px;
@@ -134,7 +144,7 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:14px; margin-bottom:22px; }
 .stat-card {
   background:var(--surface); border-radius:14px; padding:16px 20px;
-  border:1px solid var(--border);
+  border:1px solid var(--border); box-shadow:var(--shadow);
 }
 .stat-label { font-size:10px; font-weight:700; color:var(--dim); letter-spacing:1.5px; text-transform:uppercase; }
 .stat-value { font-size:24px; font-weight:700; font-family:'JetBrains Mono',monospace; margin-top:4px; }
@@ -163,7 +173,7 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 }
 .form-input {
   width:100%; padding:11px 14px; border-radius:10px;
-  border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.04);
+  border:1px solid var(--border); background:var(--surface2);
   color:var(--text); font-size:14px; font-family:'Outfit',sans-serif;
   outline:none; transition: border-color 0.2s;
 }
@@ -171,7 +181,7 @@ body { background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif;
 .form-input-lg { font-size:28px; font-family:'JetBrains Mono',monospace; font-weight:700; text-align:center; padding:18px; }
 .form-input-lg::placeholder { font-size:16px; font-weight:400; color:var(--dim2); font-family:'Outfit',sans-serif; }
 select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
-select.form-input option { background:#111827; }
+select.form-input option { background:var(--surface2); }
 .form-submit {
   width:100%; padding:14px; border-radius:12px; border:none; cursor:pointer;
   font-size:15px; font-weight:700; font-family:'Outfit',sans-serif;
@@ -194,15 +204,15 @@ select.form-input option { background:#111827; }
 .outlier-dev { margin-left:8px; font-size:12px; font-family:'JetBrains Mono',monospace; }
 
 .yoy-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
-.yoy-card { background:rgba(255,255,255,0.02); border-radius:12px; padding:16px; text-align:center; }
+.yoy-card { background:var(--surface2); border-radius:12px; padding:16px; text-align:center; }
 .yoy-year { font-size:13px; color:var(--dim); font-weight:600; }
 .yoy-avg { font-size:26px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--accent); margin:4px 0; }
 .yoy-sub { font-size:11px; color:var(--dim); }
 
 .run-table { width:100%; border-collapse:collapse; font-size:13px; }
 .run-table th { text-align:left; padding:8px 10px; font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; border-bottom:1px solid var(--border); }
-.run-table td { padding:9px 10px; border-bottom:1px solid rgba(255,255,255,0.03); }
-.run-table tr:hover td { background:rgba(255,255,255,0.02); }
+.run-table td { padding:9px 10px; border-bottom:1px solid var(--border); }
+.run-table tr:hover td { background:var(--surface2); }
 
 .toast {
   position:fixed; top:20px; right:20px; background:var(--accent); color:#fff;
@@ -214,8 +224,8 @@ select.form-input option { background:#111827; }
 
 /* Add-new inline */
 .add-new-btn {
-  width:38px; height:38px; border-radius:10px; border:1px dashed rgba(255,255,255,0.15);
-  background:rgba(255,255,255,0.04); color:var(--dim); font-size:20px; cursor:pointer;
+  width:38px; height:38px; border-radius:10px; border:1px dashed var(--dim2);
+  background:var(--surface2); color:var(--dim); font-size:20px; cursor:pointer;
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
   transition: all 0.2s; font-family:'Outfit',sans-serif;
 }
@@ -234,7 +244,7 @@ select.form-input option { background:#111827; }
 .add-new-cancel {
   padding:7px 10px; border-radius:8px; border:none; cursor:pointer;
   font-size:14px; font-weight:700; font-family:'Outfit',sans-serif;
-  background:rgba(255,255,255,0.06); color:var(--dim);
+  background:color-mix(in srgb,var(--text) 8%,transparent); color:var(--dim);
   transition: color 0.2s;
 }
 .add-new-cancel:hover { color:var(--text); }
@@ -260,6 +270,12 @@ select.form-input option { background:#111827; }
   .ai-msg { max-width:92%; padding:14px 16px; font-size:13px; }
   .ai-input-wrap { padding:12px 0 4px; }
   .ai-input { padding:12px 14px; font-size:13px; }
+  .tabbar { display:grid; }
+  #nav-tabs { display:none; }
+  .header-icon-btn { display:flex; }
+  .main { padding-bottom:120px; }
+  .toast { top:auto; bottom:calc(96px + env(safe-area-inset-bottom)); left:16px; right:16px; justify-content:center; }
+  .ai-input-wrap { bottom:calc(72px + env(safe-area-inset-bottom)); }
 }
 /* AI Chat */
 .ai-container { max-width:720px; margin:0 auto; }
@@ -292,7 +308,7 @@ select.form-input option { background:#111827; }
 .ai-msg.assistant p { margin-bottom:10px; }
 .ai-msg.assistant p:last-child { margin-bottom:0; }
 .ai-msg.assistant strong { color:#a78bfa; font-weight:600; }
-.ai-msg.assistant code { background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:12px; }
+.ai-msg.assistant code { background:color-mix(in srgb,var(--text) 8%,transparent); padding:2px 6px; border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:12px; }
 .ai-msg.assistant ul, .ai-msg.assistant ol { margin:8px 0; padding-left:20px; }
 .ai-msg.assistant li { margin-bottom:4px; }
 .ai-typing { display:flex; gap:5px; padding:16px 20px; align-self:flex-start; }
@@ -322,9 +338,65 @@ select.form-input option { background:#111827; }
 .ai-send:disabled { opacity:0.4; cursor:default; transform:none; box-shadow:none; }
 .ai-clear { position:absolute; right:0; top:-36px; background:none; border:none; color:var(--dim); font-size:11px; cursor:pointer; font-family:'Outfit',sans-serif; padding:4px 8px; border-radius:6px; transition:color 0.2s; }
 .ai-clear:hover { color:var(--text); }
+
+/* ═══ A11Y FLOOR ═══ */
+:focus-visible { outline:2px solid var(--accent2); outline-offset:2px; border-radius:8px; }
+@media(prefers-reduced-motion:reduce){ *,*::before,*::after{ animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; scroll-behavior:auto!important; } }
+
+/* ═══ ICONS ═══ */
+.icon { width:22px; height:22px; stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round; display:block; }
+.icon-sm { width:16px; height:16px; }
+
+/* ═══ SUBMIT GUARD STATES ═══ */
+.form-submit:disabled { opacity:.55; cursor:default; transform:none; }
+.form-submit.warn { background:linear-gradient(135deg,var(--orange),#b45309); font-size:13px; }
+
+/* ═══ UNDO TOAST ═══ */
+.toast { display:flex; align-items:center; gap:12px; }
+.toast-undo { background:rgba(255,255,255,0.18); border:none; color:#fff; font-weight:800; font-size:12px; letter-spacing:.5px; padding:5px 12px; border-radius:8px; cursor:pointer; font-family:'Outfit',sans-serif; text-transform:uppercase; }
+.toast-undo:hover { background:rgba(255,255,255,0.3); }
+
+/* ═══ EMPTY RANGE HINT ═══ */
+.range-hint { display:flex; align-items:center; gap:12px; flex-wrap:wrap; background:var(--surface); border:1px dashed var(--dim2); border-radius:14px; padding:14px 18px; margin-bottom:18px; font-size:13px; color:var(--dim); }
+.range-hint button { background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:1px; padding:6px 14px; border-radius:16px; cursor:pointer; transition:border-color .2s; }
+.range-hint button:hover { border-color:var(--accent2); }
+
+/* ═══ MOBILE TAB BAR ═══ */
+.tabbar { position:fixed; left:0; right:0; bottom:0; z-index:150; display:none; grid-template-columns:repeat(5,1fr); align-items:end; background:color-mix(in srgb,var(--surface) 92%,transparent); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-top:1px solid var(--border); padding:8px 6px calc(8px + env(safe-area-inset-bottom)); }
+.tab-item { display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; color:var(--dim); font-family:'Outfit',sans-serif; font-size:10px; font-weight:600; letter-spacing:.3px; padding:4px 0 2px; cursor:pointer; transition:color .2s; }
+.tab-item.active { color:var(--accent); }
+.tab-log { width:52px; height:52px; margin:-22px auto 0; border-radius:50%; border:none; cursor:pointer; background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 60%,#000)); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px var(--accent-glow), 0 2px 6px rgba(0,0,0,.35); transition:transform .15s; }
+.tab-log:active { transform:scale(.94); }
+.tab-log .icon { width:26px; height:26px; stroke-width:2.2; }
+.header-icon-btn { display:none; width:36px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--dim); cursor:pointer; align-items:center; justify-content:center; transition:all .25s; }
+.header-icon-btn:hover { color:var(--text); }
+
+/* ═══ LOG SHEET ═══ */
+.sheet-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(3px); z-index:300; opacity:0; pointer-events:none; transition:opacity .25s; }
+.sheet-overlay.open { opacity:1; pointer-events:auto; }
+.sheet { position:fixed; left:0; right:0; bottom:0; z-index:301; background:var(--surface); border-radius:22px 22px 0 0; border:1px solid var(--border); border-bottom:none; padding:14px 18px calc(22px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .3s cubic-bezier(.32,.72,.24,1); box-shadow:0 -12px 40px rgba(0,0,0,.4); }
+.sheet.open { transform:translateY(0); }
+.sheet-grab { width:38px; height:4px; border-radius:2px; background:var(--dim2); margin:0 auto 16px; }
+.sheet-btn { display:flex; align-items:center; gap:14px; width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:10px; cursor:pointer; text-align:left; font-family:'Outfit',sans-serif; color:var(--text); transition:border-color .2s; }
+.sheet-btn:hover { border-color:var(--accent2); }
+.sheet-btn .icon { color:var(--accent); flex-shrink:0; }
+.sheet-btn-title { font-size:15px; font-weight:700; }
+.sheet-btn-sub { font-size:12px; color:var(--dim); margin-top:2px; }
 </style>
 </head>
 <body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.8"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.8"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.8"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24"><path d="M3.5 17.5 9 11.5l4 3.5 7-8"/><path d="M15.5 7h4.5v4.5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9.2 19.5 11 13.8 12.8 12 18.5 10.2 12.8 4.5 11 10.2 9.2Z"/><path d="M18.5 16.5 19.2 18.8 21.5 19.5 19.2 20.2 18.5 22.5 17.8 20.2 15.5 19.5 17.8 18.8Z"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 21c-3.9 0-6.5-2.6-6.5-6 0-2.7 1.6-4.4 3-6.2C9.8 7.2 11 5.5 11 3c3 2 7.5 6.4 7.5 12 0 3.4-2.6 6-6.5 6Z"/><path d="M12 21c-1.8 0-3-1.3-3-3 0-1.9 1.6-2.9 3-5 1.4 2.1 3 3.1 3 5 0 1.7-1.2 3-3 3Z"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 9.5c1-1.6 2.4-2.5 4-2.5s3 .9 4 2.5"/><path d="M12 7v3"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 3 5.5 13.5h5L10.5 21l8-10.5h-5L13.5 3Z"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+</defs></svg>
 
 <div class="header">
   <div class="header-inner">
@@ -332,17 +404,18 @@ select.form-input option { background:#111827; }
       <div class="logo-icon">🏃</div>
       <div class="logo-text">STRIDE</div>
       <div style="flex:1"></div>
-      <button class="gear-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+      <button class="header-icon-btn" id="hdr-strava" onclick="switchView('strava')" aria-label="Strava" title="Strava"><svg class="icon" style="width:18px;height:18px"><use href="#i-flame"/></svg></button>
+      <button class="gear-btn" onclick="toggleSettings()" title="Settings" aria-label="Settings">⚙</button>
     </div>
     <div class="subtitle" id="subtitle">Weight & Run Tracker</div>
     <div class="nav" id="nav-tabs">
-      <button class="nav-btn active" onclick="switchView('dashboard')">Dashboard</button>
-      <button class="nav-btn" onclick="switchView('log-weight')">Log Weight</button>
-      <button class="nav-btn" onclick="switchView('log-run')">Log Run</button>
-      <button class="nav-btn" onclick="switchView('insights')">Insights</button>
-      <button class="nav-btn" onclick="switchView('health')">Health</button>
-      <button class="nav-btn" onclick="switchView('strava')" style="color:#fc4c02">Strava</button>
-      <button class="nav-btn" onclick="switchView('ai')" style="color:#a78bfa">✦ AI</button>
+      <button class="nav-btn active" onclick="switchView('dashboard')" data-view="dashboard">Dashboard</button>
+      <button class="nav-btn" onclick="switchView('log-weight')" data-view="log-weight">Log Weight</button>
+      <button class="nav-btn" onclick="switchView('log-run')" data-view="log-run">Log Run</button>
+      <button class="nav-btn" onclick="switchView('insights')" data-view="insights">Insights</button>
+      <button class="nav-btn" onclick="switchView('health')" data-view="health">Health</button>
+      <button class="nav-btn" onclick="switchView('strava')" data-view="strava" style="color:#fc4c02">Strava</button>
+      <button class="nav-btn" onclick="switchView('ai')" data-view="ai" style="color:#a78bfa">✦ AI</button>
     </div>
     <div class="nav nav-range" id="nav-range">
       <button class="range-btn active" onclick="switchRange('1w')">1W</button>
@@ -365,14 +438,14 @@ select.form-input option { background:#111827; }
   </div>
   <div class="settings-section">
     <div class="settings-label">CLOUD SYNC</div>
-    <div id="supabase-status" style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:13px">
+    <div id="supabase-status" style="padding:12px 16px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13px">
       <span style="font-weight:600">☁️ Supabase</span> — <span id="supabase-status-text" style="color:var(--dim)">Checking...</span>
       <div id="supabase-details" style="margin-top:8px;font-size:11px;color:var(--dim2);line-height:1.6"></div>
     </div>
   </div>
   <div class="settings-section">
     <div class="settings-label">INTEGRATIONS</div>
-    <div id="strava-status" style="padding:12px 16px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid var(--border);font-size:13px">
+    <div id="strava-status" style="padding:12px 16px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13px">
       <span style="font-weight:600">🔶 Strava</span> — <span id="strava-status-text" style="color:var(--dim)">Checking...</span>
     </div>
   </div>
@@ -385,6 +458,12 @@ select.form-input option { background:#111827; }
 <div class="main">
   <!-- ═══ DASHBOARD ═══ -->
   <div id="view-dashboard">
+    <div class="range-hint hidden" id="range-empty-hint" role="status">
+      <svg class="icon icon-sm" style="color:var(--dim)"><use href="#i-trend"/></svg>
+      <span>No entries in this range yet.</span>
+      <button onclick="switchRange('ytd')">View YTD</button>
+      <button onclick="switchRange('all')">View All</button>
+    </div>
     <div class="stats-grid" id="stats-grid"></div>
     <div class="card">
       <div class="card-title">WEIGHT TREND <span style="color:var(--accent)">● actual</span> <span style="color:var(--accent2)">● 7-day avg</span> <span style="color:var(--orange)" id="outlier-legend"></span></div>
@@ -417,7 +496,7 @@ select.form-input option { background:#111827; }
         <div class="form-grid">
           <div class="form-group"><label>Date</label><input type="date" id="wDate" class="form-input"></div>
           <div class="form-group"><label>Weight (lbs)</label><input type="number" step="0.1" placeholder="—" id="wVal" class="form-input form-input-lg"></div>
-          <button class="form-submit" onclick="addWeight()">Save Weigh-In</button>
+          <button class="form-submit" id="wSaveBtn" onclick="addWeight()">Save Weigh-In</button>
           <div class="empty-state" id="wLast"></div>
         </div>
       </div>
@@ -466,7 +545,7 @@ select.form-input option { background:#111827; }
             <div class="form-group"><label>Avg Heart Rate</label><input type="number" placeholder="155" id="rHR" class="form-input"></div>
           </div>
           <div class="form-group"><label>Notes</label><input placeholder="Weather, effort, how it felt..." id="rNotes" class="form-input"></div>
-          <button class="form-submit" onclick="addRun()">Save Run</button>
+          <button class="form-submit" id="rSaveBtn" onclick="addRun()">Save Run</button>
         </div>
       </div>
     </div>
@@ -573,7 +652,7 @@ select.form-input option { background:#111827; }
       <div class="card">
         <div class="card-title">🗺️ GPS ROUTE MAP <span style="color:var(--dim2)">click a run to view route</span></div>
         <div id="strava-map-select" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"></div>
-        <div id="strava-map" style="height:350px;border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.03)"></div>
+        <div id="strava-map" style="height:350px;border-radius:10px;overflow:hidden;background:var(--surface2)"></div>
       </div>
       <div class="card collapsible">
         <div class="card-title collapsible-toggle" onclick="toggleCollapse(this)"><span class="collapse-arrow open">▸</span> 📋 STRAVA ACTIVITY LOG</div>
@@ -609,6 +688,27 @@ select.form-input option { background:#111827; }
     </div>
   </div>
 
+</div>
+
+<nav class="tabbar" role="navigation" aria-label="Primary">
+  <button class="tab-item active" data-view="dashboard" onclick="switchView('dashboard')" aria-label="Dashboard"><svg class="icon"><use href="#i-grid"/></svg>Home</button>
+  <button class="tab-item" data-view="insights" onclick="switchView('insights')" aria-label="Insights"><svg class="icon"><use href="#i-trend"/></svg>Insights</button>
+  <button class="tab-log" onclick="openLogSheet()" aria-label="Log entry"><svg class="icon"><use href="#i-plus"/></svg></button>
+  <button class="tab-item" data-view="health" onclick="switchView('health')" aria-label="Health"><svg class="icon"><use href="#i-pulse"/></svg>Health</button>
+  <button class="tab-item" data-view="ai" onclick="switchView('ai')" aria-label="AI assistant"><svg class="icon"><use href="#i-spark"/></svg>AI</button>
+</nav>
+
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeLogSheet()"></div>
+<div class="sheet" id="log-sheet" role="dialog" aria-label="Log an entry">
+  <div class="sheet-grab"></div>
+  <button class="sheet-btn" onclick="closeLogSheet();switchView('log-weight')">
+    <svg class="icon"><use href="#i-scale"/></svg>
+    <span><span class="sheet-btn-title">Log Weight</span><br><span class="sheet-btn-sub">Add today's weigh-in</span></span>
+  </button>
+  <button class="sheet-btn" onclick="closeLogSheet();switchView('log-run')">
+    <svg class="icon"><use href="#i-bolt"/></svg>
+    <span><span class="sheet-btn-title">Log Run</span><br><span class="sheet-btn-sub">Record a run manually</span></span>
+  </button>
 </div>
 
 <div class="toast hidden" id="toast"></div>
@@ -650,8 +750,8 @@ async function sbFetch(table,method,body,query=''){
 
 async function sbLoadWeights(){
   try{
-    const data=await sbFetch('weights','GET',null,'?select=date,weight&order=date.asc');
-    if(data.length>0) return data.map(r=>({date:r.date,weight:r.weight}));
+    const data=await sbFetch('weights','GET',null,'?select=id,date,weight&order=date.asc');
+    if(data.length>0) return data.map(r=>({id:r.id,date:r.date,weight:r.weight}));
   }catch(e){console.warn('Supabase weights load failed:',e);}
   return null;
 }
@@ -660,7 +760,7 @@ async function sbLoadRuns(){
   try{
     const data=await sbFetch('runs','GET',null,'?select=*&order=date.asc');
     if(data.length>0) return data.map(r=>({
-      date:r.date||'',route:r.route||'',pace:r.pace||'',mileage:r.mileage?String(r.mileage):'',
+      id:r.id,date:r.date||'',route:r.route||'',pace:r.pace||'',mileage:r.mileage?String(r.mileage):'',
       time:r.time||'',shoe:r.shoe||'',avgHR:r.avg_hr||'',notes:r.notes||'',
       source:r.source||'manual',stravaId:r.strava_id||null,elevation:r.elevation||0,
       sufferScore:r.suffer_score||0,maxHR:r.max_hr||0,avgSpeed:r.avg_speed||0,
@@ -688,49 +788,60 @@ async function sbSaveRun(run){
   }catch(e){console.warn('Supabase run save failed:',e);}
 }
 
-async function sbDeleteRun(date,route,pace){
+async function sbDeleteRun(run){
   try{
-    let q='?date=eq.'+date+'&route=eq.'+encodeURIComponent(route);
-    if(pace&&pace!=='—') q+='&pace=eq.'+encodeURIComponent(pace);
-    else q+='&pace=is.null';
+    let q;
+    if(run.id) q='?id=eq.'+run.id;
+    else{
+      q='?date=eq.'+run.date+'&route=eq.'+encodeURIComponent(run.route);
+      if(run.pace&&run.pace!=='—') q+='&pace=eq.'+encodeURIComponent(run.pace);
+      else q+='&or='+encodeURIComponent('(pace.is.null,pace.eq."")');
+    }
     await sbFetch('runs','DELETE',null,q);
   }catch(e){console.warn('Supabase run delete failed:',e);}
 }
 
-async function sbDeleteWeight(date,weight){
+async function sbDeleteWeight(w){
   try{
-    await sbFetch('weights','DELETE',null,'?date=eq.'+date+'&weight=eq.'+weight);
+    const q=w.id?('?id=eq.'+w.id):('?date=eq.'+w.date+'&weight=eq.'+w.weight);
+    await sbFetch('weights','DELETE',null,q);
   }catch(e){console.warn('Supabase weight delete failed:',e);}
 }
 
 function deleteRun(idx){
-  const fr=filterByRange(runs);
-  const sorted=[...fr].reverse();
+  const sorted=[...filterByRange(runs)].reverse();
   const run=sorted[idx];
   if(!run) return;
-  if(!confirm('Delete run on '+fmtFull(run.date)+' ('+run.route+')?')) return;
   const ri=runs.indexOf(run);
   if(ri>-1) runs.splice(ri,1);
-  saveData();
-  sbDeleteRun(run.date,run.route,run.pace);
-  showToast('🗑 Run deleted');
-  renderInsights();
+  saveData(); renderInsights();
+  sbDeleteRun(run);
+  showToast('Run deleted',{action:{label:'Undo',fn:()=>{
+    runs.splice(Math.min(ri,runs.length),0,run);
+    runs.sort((a,b)=>a.date.localeCompare(b.date));
+    saveData(); sbSaveRun(run); renderInsights();
+    showToast('Run restored');
+  }}});
 }
 
 function deleteWeight(idx){
-  const fw=filterByRange(weights);
-  const sorted=[...fw].reverse();
+  const sorted=[...filterByRange(weights)].reverse();
   const w=sorted[idx];
   if(!w) return;
-  if(!confirm('Delete weigh-in on '+fmtFull(w.date)+' ('+w.weight+' lbs)?')) return;
   const wi=weights.indexOf(w);
   if(wi>-1) weights.splice(wi,1);
-  saveData();
-  sbDeleteWeight(w.date,w.weight);
-  showToast('🗑 Weigh-in deleted');
+  saveData(); sbDeleteWeight(w);
   if(currentView==='insights') renderInsights();
   if(currentView==='dashboard') renderDashboard();
   updateWeightFormHint();
+  showToast('Weigh-in deleted',{action:{label:'Undo',fn:()=>{
+    weights.splice(Math.min(wi,weights.length),0,w);
+    weights.sort((a,b)=>a.date.localeCompare(b.date));
+    saveData(); sbSaveWeight(w.date,w.weight);
+    if(currentView==='dashboard') renderDashboard();
+    updateWeightFormHint();
+    showToast('Weigh-in restored');
+  }}});
 }
 
 async function sbSeedWeights(wArr){
@@ -1014,11 +1125,31 @@ function movingAvg(arr, key, win=7) {
   });
 }
 
-function showToast(msg) {
+let toastTimer=null, toastAction=null;
+function showToast(msg, opts={}) {
   const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.remove('hidden');
-  setTimeout(()=>t.classList.add('hidden'),2200);
+  toastAction=opts.action||null;
+  t.innerHTML=msg+(toastAction?'<button class="toast-undo" onclick="toastAct()">'+toastAction.label+'</button>':'');
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.classList.add('hidden');toastAction=null;}, opts.duration||(toastAction?5000:2200));
 }
+function toastAct(){
+  const fn=toastAction&&toastAction.fn; toastAction=null;
+  document.getElementById('toast').classList.add('hidden');
+  if(fn) fn();
+}
+
+// ═══ LOG SHEET ═══
+function openLogSheet(){
+  document.getElementById('sheet-overlay').classList.add('open');
+  document.getElementById('log-sheet').classList.add('open');
+}
+function closeLogSheet(){
+  document.getElementById('sheet-overlay').classList.remove('open');
+  document.getElementById('log-sheet').classList.remove('open');
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogSheet();});
 
 // ═══ NAVIGATION ═══
 function switchView(v) {
@@ -1026,9 +1157,10 @@ function switchView(v) {
   ['dashboard','log-weight','log-run','insights','health','strava','ai'].forEach(id=>{
     document.getElementById('view-'+id).classList.toggle('hidden',id!==v);
   });
-  document.querySelectorAll('.nav-btn').forEach(btn=>{
-    const t=btn.textContent.toLowerCase().replace(' ','-').replace('✦-','');
-    btn.classList.toggle('active', t===v);
+  document.querySelectorAll('[data-view]').forEach(btn=>{
+    const on=btn.dataset.view===v;
+    btn.classList.toggle('active',on);
+    if(on) btn.setAttribute('aria-current','page'); else btn.removeAttribute('aria-current');
   });
   if(v==='dashboard') renderDashboard();
   if(v==='insights') renderInsights();
@@ -1061,42 +1193,56 @@ function toggleCollapse(titleEl) {
 
 // ═══ THEMES ═══
 const THEMES={
-  default:{
-    name:'Default',desc:'Dark navy with red accents',
-    bg:'#07080f',surface:'#0f1119',surface2:'#161822',border:'rgba(255,255,255,0.06)',
-    accent:'#e63946',accentGlow:'rgba(230,57,70,0.15)',accent2:'#457b9d',
-    green:'#2ec4b6',orange:'#f77f00',text:'#e8eaed',dim:'#6b7280',dim2:'#3d4250',
-    headerBg:'linear-gradient(165deg, #07080f 0%, #111827 40%, #0c1929 100%)',
-    logoBg:'linear-gradient(135deg, #e63946, #c1121f)',logoText:'linear-gradient(135deg, #e63946, #f77f00)'
-  },
   midnight:{
-    name:'Midnight',desc:'Deep blue with electric cyan',
-    bg:'#060a14',surface:'#0b1120',surface2:'#11192e',border:'rgba(100,160,255,0.06)',
-    accent:'#38bdf8',accentGlow:'rgba(56,189,248,0.15)',accent2:'#818cf8',
-    green:'#34d399',orange:'#fb923c',text:'#e2e8f0',dim:'#64748b',dim2:'#334155',
-    headerBg:'linear-gradient(165deg, #060a14 0%, #0c1631 40%, #0a1228 100%)',
-    logoBg:'linear-gradient(135deg, #38bdf8, #818cf8)',logoText:'linear-gradient(135deg, #38bdf8, #818cf8)'
+    name:'Midnight',desc:'Deep navy · signal red — night runs',
+    bg:'#07080f',surface:'#0f1119',surface2:'#161a24',border:'rgba(255,255,255,0.07)',
+    accent:'#e63946',accentGlow:'rgba(230,57,70,0.16)',accent2:'#5b8db8',
+    green:'#2ec4b6',orange:'#f59e0b',text:'#e8eaed',dim:'#8b93a3',dim2:'#3d4250',
+    shadow:'0 1px 2px rgba(0,0,0,0.4)',themeColor:'#07080f',
+    headerBg:'linear-gradient(165deg,#07080f 0%,#111827 45%,#0c1929 100%)',
+    logoBg:'linear-gradient(135deg,#e63946,#c1121f)',logoText:'linear-gradient(135deg,#e63946,#f77f00)'
   },
-  ember:{
-    name:'Ember',desc:'Warm charcoal with amber glow',
-    bg:'#0f0b08',surface:'#181210',surface2:'#211a16',border:'rgba(255,180,100,0.06)',
-    accent:'#f59e0b',accentGlow:'rgba(245,158,11,0.15)',accent2:'#d97706',
-    green:'#10b981',orange:'#ef4444',text:'#fef3c7',dim:'#92785a',dim2:'#4a3c2c',
-    headerBg:'linear-gradient(165deg, #0f0b08 0%, #1a1410 40%, #181008 100%)',
-    logoBg:'linear-gradient(135deg, #f59e0b, #d97706)',logoText:'linear-gradient(135deg, #f59e0b, #ef4444)'
+  daylight:{
+    name:'Daylight',desc:'Paper white · cobalt ink — morning miles',
+    bg:'#f6f7f9',surface:'#ffffff',surface2:'#edeff4',border:'rgba(15,23,42,0.10)',
+    accent:'#4f46e5',accentGlow:'rgba(79,70,229,0.15)',accent2:'#0284c7',
+    green:'#059669',orange:'#d97706',text:'#0f172a',dim:'#5b6779',dim2:'#b3bcca',
+    shadow:'0 1px 3px rgba(16,24,40,0.08),0 1px 2px rgba(16,24,40,0.05)',themeColor:'#f6f7f9',
+    headerBg:'linear-gradient(165deg,#ffffff 0%,#eef1f6 100%)',
+    logoBg:'linear-gradient(135deg,#4f46e5,#3730a3)',logoText:'linear-gradient(135deg,#4f46e5,#0284c7)'
   },
-  forest:{
-    name:'Forest',desc:'Deep green with emerald highlights',
-    bg:'#070d0a',surface:'#0d1612',surface2:'#141f1a',border:'rgba(100,220,160,0.06)',
-    accent:'#10b981',accentGlow:'rgba(16,185,129,0.15)',accent2:'#6ee7b7',
-    green:'#34d399',orange:'#fbbf24',text:'#d1fae5',dim:'#6b8a7a',dim2:'#2d4a3c',
-    headerBg:'linear-gradient(165deg, #070d0a 0%, #0e1c14 40%, #0a1810 100%)',
-    logoBg:'linear-gradient(135deg, #10b981, #059669)',logoText:'linear-gradient(135deg, #10b981, #6ee7b7)'
+  hud:{
+    name:'HUD',desc:'Carbon black · electric cyan — race telemetry',
+    bg:'#030608',surface:'#0a1014',surface2:'#111a21',border:'rgba(94,234,212,0.11)',
+    accent:'#22d3ee',accentGlow:'rgba(34,211,238,0.16)',accent2:'#818cf8',
+    green:'#34d399',orange:'#fbbf24',text:'#e7f6f8',dim:'#7d93a0',dim2:'#31424d',
+    shadow:'0 1px 2px rgba(0,0,0,0.5)',themeColor:'#030608',
+    headerBg:'linear-gradient(165deg,#030608 0%,#07131a 50%,#04202a 100%)',
+    logoBg:'linear-gradient(135deg,#22d3ee,#0891b2)',logoText:'linear-gradient(135deg,#22d3ee,#818cf8)'
+  },
+  trail:{
+    name:'Trail',desc:'Forest dusk · marker amber — off-road',
+    bg:'#0a0e0a',surface:'#111710',surface2:'#1a2318',border:'rgba(214,211,196,0.09)',
+    accent:'#d97706',accentGlow:'rgba(217,119,6,0.16)',accent2:'#84a98c',
+    green:'#65a30d',orange:'#ea580c',text:'#edefe6',dim:'#8b957f',dim2:'#3a4436',
+    shadow:'0 1px 2px rgba(0,0,0,0.45)',themeColor:'#0a0e0a',
+    headerBg:'linear-gradient(165deg,#0a0e0a 0%,#121a10 50%,#0e1c14 100%)',
+    logoBg:'linear-gradient(135deg,#d97706,#92400e)',logoText:'linear-gradient(135deg,#d97706,#a3b18a)'
+  },
+  graphite:{
+    name:'Graphite',desc:'Pure grayscale · quiet data — no noise',
+    bg:'#0a0a0b',surface:'#131315',surface2:'#1c1c1f',border:'rgba(255,255,255,0.08)',
+    accent:'#d4d4d8',accentGlow:'rgba(212,212,216,0.10)',accent2:'#a1a1aa',
+    green:'#86d9a8',orange:'#e0b089',text:'#f4f4f5',dim:'#8f8f96',dim2:'#3f3f46',
+    shadow:'0 1px 2px rgba(0,0,0,0.5)',themeColor:'#0a0a0b',
+    headerBg:'linear-gradient(165deg,#0a0a0b 0%,#151517 100%)',
+    logoBg:'linear-gradient(135deg,#e4e4e7,#71717a)',logoText:'linear-gradient(135deg,#fafafa,#a1a1aa)'
   }
 };
 
 function applyTheme(id) {
-  const t=THEMES[id]; if(!t)return;
+  if(!THEMES[id]) id='midnight';
+  const t=THEMES[id];
   const r=document.documentElement.style;
   r.setProperty('--bg',t.bg);
   r.setProperty('--surface',t.surface);
@@ -1110,6 +1256,8 @@ function applyTheme(id) {
   r.setProperty('--text',t.text);
   r.setProperty('--dim',t.dim);
   r.setProperty('--dim2',t.dim2);
+  r.setProperty('--shadow',t.shadow);
+  const mt=document.getElementById('meta-theme'); if(mt) mt.content=t.themeColor;
   document.querySelector('.header').style.background=t.headerBg;
   document.querySelector('.logo-icon').style.background=t.logoBg;
   const lt=document.querySelector('.logo-text');
@@ -1121,7 +1269,7 @@ function applyTheme(id) {
   renderThemeGrid();
 }
 
-let currentTheme='default';
+let currentTheme='midnight';
 
 function renderThemeGrid() {
   const grid=document.getElementById('theme-grid');
@@ -1187,13 +1335,24 @@ function renderDashboard() {
 
   document.getElementById('subtitle').textContent=`Weight & Run Tracker — ${weights.length} weigh-ins · ${runs.length} runs logged`;
 
+  // Empty-range hint
+  const hint=document.getElementById('range-empty-hint');
+  if(hint){
+    const nothingHere=!fw.length&&!fr.length&&(weights.length>0||runs.length>0);
+    hint.classList.toggle('hidden',!nothingHere);
+    if(nothingHere){
+      const labels={'1w':'past week','1m':'past month','3m':'past 3 months','6m':'past 6 months','ytd':'year so far','1y':'past year'};
+      hint.querySelector('span').textContent='Nothing logged in the '+(labels[currentRange]||'selected range')+'. Your history is safe — widen the view:';
+    }
+  }
+
   // Stats grid
   const statsHTML = [
-    {l:'Current',v:ws.last?ws.last+' lb':'—',s:'Last weigh-in'},
+    {l:'Current',v:ws.last?ws.last+' lb':'—',s:ws.last?'Last weigh-in':(weights.length?'None in this range':'Log your first weigh-in')},
     {l:'Average',v:ws.avg?ws.avg.toFixed(1)+' lb':'—',s:`${ws.count||0} entries`},
-    {l:'Range',v:ws.min?ws.min+'–'+ws.max:'—',s:(ws.max-ws.min).toFixed(1)+' lb spread'},
+    {l:'Range',v:ws.min?ws.min+'–'+ws.max:'—',s:ws.min?(ws.max-ws.min).toFixed(1)+' lb spread':'—'},
     {l:'Trend',v:trend?(trend>0?'+':'')+trend+' lb':'—',s:'Period start vs end',c:trend>0?'var(--orange)':'var(--green)'},
-    {l:'Runs',v:fr.length||'0',s:totalMi?totalMi.toFixed(1)+' mi total':'Log your first run'},
+    {l:'Runs',v:fr.length||'0',s:totalMi?totalMi.toFixed(1)+' mi total':(runs.length?'None in this range':'Log your first run')},
     {l:'Best Pace',v:fmtPace(bestP),s:avgP?'Avg: '+fmtPace(avgP)+'/mi':'—'},
   ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c||'var(--text)'}">${s.v}</div><div class="stat-sub">${s.s}</div></div>`).join('');
   document.getElementById('stats-grid').innerHTML=statsHTML;
@@ -1468,21 +1627,41 @@ function confirmAddNew(type) {
 
 // ═══ FORM HANDLERS ═══
 function addWeight() {
+  const btn=document.getElementById('wSaveBtn');
   const date=document.getElementById('wDate').value;
   const val=parseFloat(document.getElementById('wVal').value);
-  if(!date||isNaN(val))return;
+  if(!date||isNaN(val)){showToast('Enter a date and weight');return;}
+  const dup=weights.find(w=>w.date===date);
+  if(dup&&!btn.dataset.confirm){
+    btn.dataset.confirm='1'; btn.classList.add('warn');
+    btn.textContent='Logged '+dup.weight+' lb on this date — tap to add anyway';
+    setTimeout(()=>{delete btn.dataset.confirm;btn.classList.remove('warn');btn.textContent='Save Weigh-In';},3500);
+    return;
+  }
+  delete btn.dataset.confirm; btn.classList.remove('warn'); btn.textContent='Save Weigh-In';
+  btn.disabled=true; setTimeout(()=>btn.disabled=false,1200);
   weights.push({date,weight:val});
   weights.sort((a,b)=>a.date.localeCompare(b.date));
-  saveData(); showToast('✓ Weight logged!');
+  saveData(); showToast('✓ Weight logged');
   sbSaveWeight(date,val);
   document.getElementById('wVal').value='';
   updateWeightFormHint();
 }
 
 function addRun() {
+  const btn=document.getElementById('rSaveBtn');
   const date=document.getElementById('rDate').value;
   const route=document.getElementById('rRoute').value;
-  if(!date||!route)return;
+  if(!date||!route){showToast('Enter a date and route');return;}
+  const dup=runs.find(r=>r.date===date);
+  if(dup&&!btn.dataset.confirm){
+    btn.dataset.confirm='1'; btn.classList.add('warn');
+    btn.textContent='Run already logged this date — tap to add anyway';
+    setTimeout(()=>{delete btn.dataset.confirm;btn.classList.remove('warn');btn.textContent='Save Run';},3500);
+    return;
+  }
+  delete btn.dataset.confirm; btn.classList.remove('warn'); btn.textContent='Save Run';
+  btn.disabled=true; setTimeout(()=>btn.disabled=false,1200);
   const newRun={
     date, route,
     pace:document.getElementById('rPace').value,
@@ -1494,7 +1673,7 @@ function addRun() {
   };
   runs.push(newRun);
   runs.sort((a,b)=>a.date.localeCompare(b.date));
-  saveData(); showToast('✓ Run logged!');
+  saveData(); showToast('✓ Run logged');
   sbSaveRun(newRun);
   ['rPace','rMiles','rTime','rHR','rNotes'].forEach(id=>document.getElementById(id).value='');
 }
@@ -1743,7 +1922,7 @@ async function renderStrava(){
 
   // Run selector buttons for zones and map
   const recent=filtered.slice(-8).reverse();
-  const btnStyle='padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--dim);font-size:11px;cursor:pointer;font-family:"JetBrains Mono",monospace';
+  const btnStyle='padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--dim);font-size:11px;cursor:pointer;font-family:"JetBrains Mono",monospace';
   const btns=recent.map(r=>`<button style="${btnStyle}" onclick="loadStravaZones('${r.stravaId}',this)" data-id="${r.stravaId}">${fmtD(r.date)} · ${r.mileage} mi</button>`).join('');
   document.getElementById('strava-zones-select').innerHTML=btns;
   const mapBtns=recent.filter(r=>r.polyline).map(r=>`<button style="${btnStyle}" onclick="loadStravaMap('${r.stravaId}',this)" data-id="${r.stravaId}">${fmtD(r.date)} · ${r.mileage} mi</button>`).join('');
@@ -1933,7 +2112,7 @@ RUNNING SUMMARY (${totalRuns} total runs):
 - Shoe stats: ${JSON.stringify(shoeStats)}
 - Recent 30 runs: ${JSON.stringify(recentRuns.map(r=>({date:r.date,route:r.route,pace:r.pace,miles:r.mileage,time:r.time,shoe:r.shoe,hr:r.avgHR,notes:r.notes,elevation:r.elevation||'',suffer:r.sufferScore||''})))}
 
-ALL RUNS (dates+pace+miles): ${allRuns.map(r=>r.date+'|'+r.pace+'|'+r.mileage+'|'+r.route+'|'+(r.shoe||'')).join('\n')}`;
+RUN LOG — most recent 60 (date|pace|mi|route|shoe): ${allRuns.slice(-60).map(r=>r.date+'|'+r.pace+'|'+r.mileage+'|'+r.route+'|'+(r.shoe||'')).join('\n')}`;
 }
 
 function aiRenderMsg(role, text){
@@ -1997,6 +2176,7 @@ Be concise, insightful, and specific — reference actual numbers, dates, and tr
 ${aiGetDataContext()}`;
 
   aiHistory.push({role:'user',content:question});
+  if(aiHistory.length>10) aiHistory=aiHistory.slice(-10);
   
   const messages=[
     {role:'user',content:systemPrompt+'\\n\\nQuestion: '+aiHistory[0].content}
