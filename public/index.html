@@ -729,11 +729,12 @@ function updateSyncUI(){
     el.innerHTML='<span style="color:#22c55e">Connected</span>';
     det.innerHTML='📊 '+syncStatus.weights+' weights · '+syncStatus.runs+' runs · '+syncStatus.strava+' strava runs<br>🕐 Last synced: '+dateStr+' '+timeStr;
   }else{
-    el.innerHTML='<span style="color:#ef4444">Offline</span> — using local data';
-    det.innerHTML='⚠️ Could not reach Supabase. Data saved locally.';
+    el.innerHTML='<span style="color:#ef4444">Cloud error</span> — using local data';
+    det.innerHTML='⚠️ '+(sbLastError||'Could not reach Supabase')+'.<br>Your cloud data is intact — this device just can\'t read it right now.';
   }
 }
 
+let sbLastError=null, syncState='pending';
 async function sbFetch(table,method,body,query=''){
   const url=SUPABASE_URL+'/rest/v1/'+table+query;
   const opts={method,headers:{...sbHeaders}};
@@ -741,9 +742,37 @@ async function sbFetch(table,method,body,query=''){
   if(body) opts.body=JSON.stringify(body);
   if(method==='POST') opts.headers['Prefer']='return=minimal,resolution=merge-duplicates';
   if(method==='DELETE') opts.headers['Prefer']='return=minimal';
-  const r=await fetch(url,opts);
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),15000);
+  opts.signal=ctrl.signal;
+  let r;
+  try{ r=await fetch(url,opts); }
+  catch(e){
+    clearTimeout(tid);
+    sbLastError=(e&&e.name==='AbortError')?'timed out — Supabase project paused?':(e.message||'network error');
+    throw e;
+  }
+  clearTimeout(tid);
+  if(!r.ok){
+    let msg='HTTP '+r.status;
+    try{const j=await r.json(); msg=j.message||j.hint||msg;}catch(_){}
+    sbLastError=msg+' ('+table+')';
+    if(method==='GET') return {error:sbLastError};
+    return r;
+  }
   if(method==='GET') return r.json();
   return r;
+}
+
+function updateSubtitle(){
+  const el=document.getElementById('subtitle')||document.querySelector('.subtitle');
+  if(!el) return;
+  const base='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs logged';
+  const suf=syncState==='synced'?' · ☁️ Synced'
+    :syncState==='error'?' · ⚠️ '+(sbLastError||'sync failed')
+    :syncState==='empty'?' · ⚠️ cloud reachable but returned no rows'
+    :'';
+  el.textContent=base+suf;
 }
 
 async function sbLoadWeights(){
@@ -753,7 +782,7 @@ async function sbLoadWeights(){
       console.warn('weights id-select failed, retrying plain:',data&&data.message);
       data=await sbFetch('weights','GET',null,'?select=date,weight&order=date.asc');
     }
-    if(!Array.isArray(data)){console.warn('weights load failed:',data&&data.message);return null;}
+    if(!Array.isArray(data)){sbLastError=(data&&(data.message||data.error))||sbLastError||'unknown error';console.warn('weights load failed:',sbLastError);return null;}
     return data.map(r=>({id:r.id,date:r.date,weight:r.weight}));
   }catch(e){console.warn('Supabase weights load failed:',e);}
   return null;
@@ -767,7 +796,7 @@ async function sbLoadRuns(){
       data=await sbFetch('runs','GET',null,'?select=*');
       if(Array.isArray(data)) data.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
     }
-    if(!Array.isArray(data)){console.warn('runs load failed:',data&&data.message);return null;}
+    if(!Array.isArray(data)){sbLastError=(data&&(data.message||data.error))||sbLastError||'unknown error';console.warn('runs load failed:',sbLastError);return null;}
     return data.map(r=>({
       id:r.id,date:r.date||'',route:r.route||'',pace:r.pace||'',mileage:r.mileage?String(r.mileage):'',
       time:r.time||'',shoe:r.shoe||'',avgHR:r.avg_hr||'',notes:r.notes||'',
@@ -1342,7 +1371,7 @@ function renderDashboard() {
   const old7=fw.slice(0,Math.min(7,fw.length)).map(x=>x.weight);
   const trend=recent7.length&&old7.length?(recent7.reduce((a,b)=>a+b)/recent7.length-old7.reduce((a,b)=>a+b)/old7.length).toFixed(1):0;
 
-  document.getElementById('subtitle').textContent=`Weight & Run Tracker — ${weights.length} weigh-ins · ${runs.length} runs logged`;
+  updateSubtitle();
 
   // Empty-range hint
   const hint=document.getElementById('range-empty-hint');
@@ -2054,11 +2083,14 @@ async function init() {
     if(currentView==='insights') renderInsights();
     if(currentView==='health') renderHealth();
     if(currentView==='strava') renderStrava();
-    document.querySelector('.subtitle').textContent='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs logged · ☁️ Synced';
+    syncState=(sbW&&sbR&&sbW.length===0&&sbR.length===0)?'empty':'synced';
+    if(sbLastError&&syncState==='synced')syncState='error';
+    updateSubtitle();
   }catch(e){
     console.warn('Supabase init failed, using local data:',e);
     syncStatus.ok=false;updateSyncUI();
-    document.querySelector('.subtitle').textContent='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs · ⚠️ sync issue, retry shortly';
+    syncState='error';
+    updateSubtitle();
   }
 
   // Fetch Strava data in background (gets new runs not yet in DB)
