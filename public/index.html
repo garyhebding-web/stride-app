@@ -271,8 +271,6 @@ select.form-input option { background:var(--surface2); }
   .ai-input-wrap { padding:12px 0 4px; }
   .ai-input { padding:12px 14px; font-size:13px; }
   .tabbar { display:grid; }
-  #nav-tabs { display:none; }
-  .header-icon-btn { display:flex; }
   .main { padding-bottom:120px; }
   .toast { top:auto; bottom:calc(96px + env(safe-area-inset-bottom)); left:16px; right:16px; justify-content:center; }
   .ai-input-wrap { bottom:calc(72px + env(safe-area-inset-bottom)); }
@@ -750,16 +748,27 @@ async function sbFetch(table,method,body,query=''){
 
 async function sbLoadWeights(){
   try{
-    const data=await sbFetch('weights','GET',null,'?select=id,date,weight&order=date.asc');
-    if(data.length>0) return data.map(r=>({id:r.id,date:r.date,weight:r.weight}));
+    let data=await sbFetch('weights','GET',null,'?select=id,date,weight&order=date.asc');
+    if(!Array.isArray(data)){
+      console.warn('weights id-select failed, retrying plain:',data&&data.message);
+      data=await sbFetch('weights','GET',null,'?select=date,weight&order=date.asc');
+    }
+    if(!Array.isArray(data)){console.warn('weights load failed:',data&&data.message);return null;}
+    return data.map(r=>({id:r.id,date:r.date,weight:r.weight}));
   }catch(e){console.warn('Supabase weights load failed:',e);}
   return null;
 }
 
 async function sbLoadRuns(){
   try{
-    const data=await sbFetch('runs','GET',null,'?select=*&order=date.asc');
-    if(data.length>0) return data.map(r=>({
+    let data=await sbFetch('runs','GET',null,'?select=*&order=date.asc');
+    if(!Array.isArray(data)){
+      console.warn('runs ordered select failed, retrying plain:',data&&data.message);
+      data=await sbFetch('runs','GET',null,'?select=*');
+      if(Array.isArray(data)) data.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+    }
+    if(!Array.isArray(data)){console.warn('runs load failed:',data&&data.message);return null;}
+    return data.map(r=>({
       id:r.id,date:r.date||'',route:r.route||'',pace:r.pace||'',mileage:r.mileage?String(r.mileage):'',
       time:r.time||'',shoe:r.shoe||'',avgHR:r.avg_hr||'',notes:r.notes||'',
       source:r.source||'manual',stravaId:r.strava_id||null,elevation:r.elevation||0,
@@ -2016,7 +2025,7 @@ async function init() {
       weights=sbW;
       syncStatus.weights=sbW.length;
       console.log('Loaded '+sbW.length+' weights from Supabase');
-    }else if(weights.length>0){
+    }else if(sbW && weights.length>0){
       // Seed Supabase from localStorage fallback
       await sbSeedWeights(weights.map(w=>({d:w.date,w:w.weight})));
       syncStatus.weights=weights.length;
@@ -2031,7 +2040,7 @@ async function init() {
       syncStatus.runs=manualRuns.length;
       syncStatus.strava=stravaFromDb.length;
       console.log('Loaded '+manualRuns.length+' manual runs + '+stravaFromDb.length+' strava runs from Supabase');
-    }else if(runs.length>0){
+    }else if(sbR && runs.length>0){
       // Seed manual runs from localStorage fallback
       await sbSeedRuns(runs);
       syncStatus.runs=runs.length;
@@ -2046,7 +2055,11 @@ async function init() {
     if(currentView==='health') renderHealth();
     if(currentView==='strava') renderStrava();
     document.querySelector('.subtitle').textContent='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs logged · ☁️ Synced';
-  }catch(e){console.warn('Supabase init failed, using local data:',e);syncStatus.ok=false;updateSyncUI();}
+  }catch(e){
+    console.warn('Supabase init failed, using local data:',e);
+    syncStatus.ok=false;updateSyncUI();
+    document.querySelector('.subtitle').textContent='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs · ⚠️ sync issue, retry shortly';
+  }
 
   // Fetch Strava data in background (gets new runs not yet in DB)
   fetchStravaActivities().then(()=>{
