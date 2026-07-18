@@ -2048,11 +2048,20 @@ async function init() {
 
   // Load from Supabase in background
   try{
+    let _recovered=0;
     const sbW=await sbLoadWeights();
     const sbR=await sbLoadRuns();
     if(sbW && sbW.length>0){
-      weights=sbW;
-      syncStatus.weights=sbW.length;
+      const cloudDates=new Set(sbW.map(w=>w.date));
+      const localOnlyW=weights.filter(w=>w&&w.date&&!cloudDates.has(w.date));
+      weights=sbW.concat(localOnlyW).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+      syncStatus.weights=weights.length;
+      if(localOnlyW.length){
+        _recovered+=localOnlyW.length;
+        localOnlyW.forEach(w=>sbSaveWeight(w.date,w.weight));
+        console.log('Recovering '+localOnlyW.length+' local-only weigh-ins to cloud');
+        showToast('\u2191 Recovered '+_recovered+' entries from this device');
+      }
       console.log('Loaded '+sbW.length+' weights from Supabase');
     }else if(sbW && weights.length>0){
       // Seed Supabase from localStorage fallback
@@ -2061,14 +2070,22 @@ async function init() {
       console.log('Seeded weights to Supabase from local');
     }
     if(sbR && sbR.length>0){
-      // Separate manual runs and strava runs
       const manualRuns=sbR.filter(r=>r.source!=='strava');
       const stravaFromDb=sbR.filter(r=>r.source==='strava');
-      if(manualRuns.length>0) runs=manualRuns;
+      const rk=r=>[r.date,r.route,(parseFloat(r.mileage)||''),(r.pace||'')].join('|');
+      const cloudKeys=new Set(sbR.map(rk));
+      const localOnlyR=runs.filter(r=>r&&r.date&&r.source!=='strava'&&!cloudKeys.has(rk(r)));
+      runs=manualRuns.concat(localOnlyR).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
       if(stravaFromDb.length>0){stravaRuns=stravaFromDb;stravaLoaded=true;}
-      syncStatus.runs=manualRuns.length;
+      syncStatus.runs=runs.length;
       syncStatus.strava=stravaFromDb.length;
-      console.log('Loaded '+manualRuns.length+' manual runs + '+stravaFromDb.length+' strava runs from Supabase');
+      if(localOnlyR.length){
+        _recovered+=localOnlyR.length;
+        localOnlyR.forEach(r=>sbSaveRun(r));
+        console.log('Recovering '+localOnlyR.length+' local-only runs to cloud');
+        showToast('\u2191 Recovered '+_recovered+' entries from this device');
+      }
+      console.log('Loaded '+manualRuns.length+' manual + '+stravaFromDb.length+' strava runs from cloud');
     }else if(sbR && runs.length>0){
       // Seed manual runs from localStorage fallback
       await sbSeedRuns(runs);
