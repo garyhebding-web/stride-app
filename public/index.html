@@ -767,7 +767,9 @@ async function sbFetch(table,method,body,query=''){
 function updateSubtitle(){
   const el=document.getElementById('subtitle')||document.querySelector('.subtitle');
   if(!el) return;
-  const base='Weight & Run Tracker — '+weights.length+' weigh-ins · '+(runs.length+stravaRuns.length)+' runs logged';
+  const _k=r=>String(r.date)+'|'+(Math.round((parseFloat(r.mileage)||0)*10)/10);
+  const _seen=new Set(); runs.concat(stravaRuns).forEach(r=>{if(r&&r.date)_seen.add(_k(r));});
+  const base='Weight & Run Tracker — '+weights.length+' weigh-ins · '+_seen.size+' runs logged';
   const suf=syncState==='synced'?' · ☁️ Synced'
     :syncState==='error'?' · ⚠️ '+(sbLastError||'sync failed')
     :syncState==='empty'?' · ⚠️ cloud reachable but returned no rows'
@@ -988,6 +990,7 @@ async function fetchStravaActivities(){
     });
     stravaLoaded=true;
     mergeStravaRuns();
+    try{updateSubtitle();}catch(e){}
     console.log('Strava: loaded '+stravaRuns.length+' runs');
   }catch(e){console.warn('Strava fetch failed:',e);}
 }
