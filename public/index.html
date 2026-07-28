@@ -275,6 +275,12 @@ select.form-input option { background:var(--surface2); }
   .toast { top:auto; bottom:calc(96px + env(safe-area-inset-bottom)); left:16px; right:16px; justify-content:center; }
   .ai-input-wrap { bottom:calc(72px + env(safe-area-inset-bottom)); }
 }
+.src-badge {
+  display:inline-flex; align-items:center; margin-left:8px; padding:2px 7px; border-radius:6px;
+  font-family:'Outfit',sans-serif; font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+  background:color-mix(in srgb,var(--accent2) 16%,transparent); color:var(--accent2);
+  border:1px solid color-mix(in srgb,var(--accent2) 32%,transparent); vertical-align:middle; white-space:nowrap;
+}
 /* AI Chat */
 .ai-container { max-width:720px; margin:0 auto; }
 .ai-welcome { text-align:center; padding:48px 24px; }
@@ -779,13 +785,13 @@ function updateSubtitle(){
 
 async function sbLoadWeights(){
   try{
-    let data=await sbFetch('weights','GET',null,'?select=id,date,weight&order=date.asc');
+    let data=await sbFetch('weights','GET',null,'?select=*&order=date.asc');
     if(!Array.isArray(data)){
       console.warn('weights id-select failed, retrying plain:',data&&data.message);
       data=await sbFetch('weights','GET',null,'?select=date,weight&order=date.asc');
     }
     if(!Array.isArray(data)){sbLastError=(data&&(data.message||data.error))||sbLastError||'unknown error';console.warn('weights load failed:',sbLastError);return null;}
-    return data.map(r=>({id:r.id,date:r.date,weight:r.weight}));
+    return data.map(r=>({id:r.id,date:r.date,weight:r.weight,source:r.source||'manual'}));
   }catch(e){console.warn('Supabase weights load failed:',e);}
   return null;
 }
@@ -1385,7 +1391,7 @@ function renderDashboard() {
 
   // Stats grid
   const statsHTML = [
-    {l:'Current',v:ws.last?ws.last+' lb':'—',s:ws.last?'Last weigh-in':(weights.length?'None in this range':'Log your first weigh-in')},
+    {l:'Current',v:ws.last?ws.last+' lb':'—',s:ws.last?('Last weigh-in'+srcBadge(fw[fw.length-1])):(weights.length?'None in this range':'Log your first weigh-in')},
     {l:'Average',v:ws.avg?ws.avg.toFixed(1)+' lb':'—',s:`${ws.count||0} entries`},
     {l:'Range',v:ws.min?ws.min+'–'+ws.max:'—',s:ws.min?(ws.max-ws.min).toFixed(1)+' lb spread':'—'},
     {l:'Trend',v:trend?(trend>0?'+':'')+trend+' lb':'—',s:'Period start vs end',c:trend>0?'var(--orange)':'var(--green)'},
@@ -1545,7 +1551,7 @@ function renderInsights() {
     if(outliers.length){
       wOutHtml=outliers.map(w=>{
         const dev=((w.weight-ws.avg)/ws.std).toFixed(1);
-        return`<div class="outlier-item outlier-weight"><span class="outlier-val" style="color:var(--orange)">${w.weight} lb</span><span class="outlier-date">${fmtFull(w.date)}</span><span class="outlier-dev" style="color:var(--orange)">${dev>0?'+':''}${dev}σ from mean</span></div>`;
+        return`<div class="outlier-item outlier-weight"><span class="outlier-val" style="color:var(--orange)">${w.weight} lb</span><span class="outlier-date">${fmtFull(w.date)}</span><span class="outlier-dev" style="color:var(--orange)">${dev>0?'+':''}${dev}σ from mean</span>${srcBadge(w)}</div>`;
       }).join('');
     } else { wOutHtml='<div class="empty-state">No significant weight outliers in this period. Your weight has been consistent.</div>'; }
   } else { wOutHtml='<div class="empty-state">Need more data to detect outliers.</div>'; }
@@ -1632,9 +1638,16 @@ function renderInsights() {
   }).join('');
 }
 
+function srcBadge(e){
+  const s=e&&e.source;
+  if(!s||s==='manual') return '';
+  const n=String(s).charAt(0).toUpperCase()+String(s).slice(1);
+  return '<span class="src-badge" title="Recorded by '+n+'">'+n+'</span>';
+}
+
 function updateWeightFormHint() {
   const last=weights[weights.length-1];
-  document.getElementById('wLast').textContent=last?`Last logged: ${last.weight} lbs on ${fmtFull(last.date)}`:'No weigh-ins yet';
+  document.getElementById('wLast').innerHTML=last?`Last logged: ${last.weight} lbs on ${fmtFull(last.date)}${srcBadge(last)}`:'No weigh-ins yet';
 }
 
 function toggleAddNew(type) {
